@@ -16,11 +16,14 @@ import {
   Percent,
   Users,
 } from "lucide-react";
+import { useDOStore } from "@/store/do-report-store";
 
 export default function DoSectionForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+
+  const { createDOReport, loading } = useDOStore();
 
   const [formData, setFormData] = useState({
     doNumber: "",
@@ -33,99 +36,101 @@ export default function DoSectionForm() {
     financerCost: "",
     issueDate: "",
     expiryDate: "",
+    lifterName: "",
     lifterCharges: "",
-    lifterTransportationCharges: "",
-    liftedQuantity: "",
+    transportCharges: "",
+    liftedQty: "",
     liftedVehicleCount: "",
     documents: [] as File[],
     remarks: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
+  // const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     firstInputRef.current?.focus();
   }, []);
 
   // Auto-calculate rate with GST (18%)
+  /* AUTO GST */
   useEffect(() => {
-    const withoutGST = parseFloat(formData.rateWithoutGST);
-    if (!isNaN(withoutGST)) {
-      const gst = withoutGST * 0.18;
-      const withGST = withoutGST + gst;
-      setFormData((prev) => ({
-        ...prev,
-        rateWithGST: withGST.toFixed(2),
+    const rate = Number(formData.rateWithoutGST);
+    if (!isNaN(rate)) {
+      setFormData((p) => ({
+        ...p,
+        rateWithGST: (rate * 1.18).toFixed(2),
       }));
-    } else {
-      setFormData((prev) => ({ ...prev, rateWithGST: "" }));
     }
   }, [formData.rateWithoutGST]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
-  ) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    setFormData((p) => ({ ...p, [name]: value }));
+    if (errors[name]) setErrors((p) => ({ ...p, [name]: "" }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setFormData((prev) => ({
-        ...prev,
-        documents: [...prev.documents, ...newFiles],
-      }));
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index),
+  const handleFileChange = (e: any) => {
+    if (!e.target.files) return;
+    setFormData((p) => ({
+      ...p,
+      documents: [...p.documents, ...Array.from(e.target.files)],
     }));
   };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.doNumber.trim()) newErrors.doNumber = "DO Number is required";
-    if (!formData.colliery.trim())
-      newErrors.colliery = "Colliery name is required";
-    if (!formData.volumeMT || Number(formData.volumeMT) <= 0)
-      newErrors.volumeMT = "Enter valid volume (MT)";
-    if (!formData.rateWithoutGST || Number(formData.rateWithoutGST) <= 0)
-      newErrors.rateWithoutGST = "Enter valid rate (without GST)";
-    if (!formData.financerName.trim())
-      newErrors.financerName = "Financer name is required";
-    if (!formData.issueDate)
-      newErrors.issueDate = "Issue date is required";
-    if (!formData.expiryDate) newErrors.expiryDate = "Expiry date is required";
-    if (!formData.liftedQuantity || Number(formData.liftedQuantity) <= 0)
-      newErrors.liftedQuantity = "Enter valid lifted quantity";
-    if (
-      !formData.liftedVehicleCount ||
-      Number(formData.liftedVehicleCount) <= 0
-    )
-      newErrors.liftedVehicleCount = "Enter valid vehicle count";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const removeFile = (i: number) => {
+    setFormData((p) => ({
+      ...p,
+      documents: p.documents.filter((_, idx) => idx !== i),
+    }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!formData.doNumber) e.doNumber = "Required";
+    if (!formData.colliery) e.colliery = "Required";
+    if (!formData.volumeMT) e.volumeMT = "Required";
+    if (!formData.rateWithoutGST) e.rateWithoutGST = "Required";
+    if (!formData.financerName) e.financerName = "Required";
+    if (!formData.issueDate) e.issueDate = "Required";
+    if (!formData.expiryDate) e.expiryDate = "Required";
+    if (!formData.lifterName) e.liftedName = "Required";
+    if (!formData.liftedQty) e.liftedQty = "Required";
+    if (!formData.liftedVehicleCount) e.liftedVehicleCount = "Required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-    setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    alert("DO Entry saved successfully!");
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    const fd = new FormData();
+
+    fd.append("doNumber", formData.doNumber);
+    fd.append("supplier", formData.colliery);
+    fd.append("volume", formData.volumeMT);
+    fd.append("rate", formData.rateWithGST);
+
+    fd.append("financerName", formData.financerName);
+    fd.append("financerOrganization", formData.financerOrganization);
+    fd.append("financerCost", formData.financerCost);
+
+    fd.append("issueDate", formData.issueDate);
+    fd.append("expiryDate", formData.expiryDate);
+
+    fd.append("lifterName", formData.lifterName);
+    fd.append("lifterCharges", formData.lifterCharges);
+    fd.append("transportCharges", formData.transportCharges);
+    fd.append("liftedQty", formData.liftedQty);
+    fd.append("liftedvehicleCount", formData.liftedVehicleCount);
+
+    fd.append("remarks", formData.remarks);
+
+    formData.documents.forEach((f) => fd.append("documents", f));
+
+    await createDOReport(fd);
     router.push("/dashboard/DOsection");
-    setSaving(false);
   };
 
   return (
@@ -247,7 +252,7 @@ export default function DoSectionForm() {
               <div className="relative">
                 <input
                   type="date"
-                  name="receiveDate"
+                  name="issueDate"
                   value={formData.issueDate}
                   onChange={handleChange}
                   className={`peer w-full px-4 py-3.5 border-b-2 ${
@@ -269,7 +274,7 @@ export default function DoSectionForm() {
               <div className="relative">
                 <input
                   type="date"
-                  name="returnDate"
+                  name="expiryDate"
                   value={formData.expiryDate}
                   onChange={handleChange}
                   className={`peer w-full px-4 py-3.5 border-b-2 ${
@@ -288,7 +293,6 @@ export default function DoSectionForm() {
                 )}
               </div>
             </div>
-            
           </section>
 
           {/* ===== RATES SECTION (Separate) ===== */}
@@ -430,6 +434,25 @@ export default function DoSectionForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="relative">
                 <div className="flex">
+                  {/* <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
+                    ₹
+                  </span> */}
+                  <input
+                    type="text"
+                    name="lifterName"
+                    value={formData.lifterName}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    step="1"
+                    className={`peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-indigo-500 rounded-r-md outline-none text-base text-white placeholder-transparent transition-colors duration-200 [appearance:textfield]`}
+                  />
+                </div>
+                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-indigo-400 transition-all duration-200">
+                  Lifter Name
+                </label>
+              </div>
+              <div className="relative">
+                <div className="flex">
                   <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
                     ₹
                   </span>
@@ -455,8 +478,8 @@ export default function DoSectionForm() {
                   </span>
                   <input
                     type="number"
-                    name="lifterTransportationCharges"
-                    value={formData.lifterTransportationCharges}
+                    name="transportCharges"
+                    value={formData.transportCharges}
                     onChange={handleChange}
                     placeholder="0.00"
                     step="1"
@@ -471,13 +494,13 @@ export default function DoSectionForm() {
               <div className="relative">
                 <input
                   type="number"
-                  name="liftedQuantity"
-                  value={formData.liftedQuantity}
+                  name="liftedQty"
+                  value={formData.liftedQty}
                   onChange={handleChange}
                   placeholder="0.00"
                   step="0.01"
                   className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.liftedQuantity
+                    errors.liftedQty
                       ? "border-red-500"
                       : "border-gray-700 focus:border-indigo-500"
                   } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200 [appearance:textfield]`}
@@ -485,9 +508,9 @@ export default function DoSectionForm() {
                 <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-indigo-400 transition-all duration-200">
                   Lifted Quantity (MT) *
                 </label>
-                {errors.liftedQuantity && (
+                {errors.liftedQty && (
                   <p className="text-red-400 text-xs mt-1.5">
-                    {errors.liftedQuantity}
+                    {errors.liftedQty}
                   </p>
                 )}
               </div>
@@ -603,11 +626,9 @@ export default function DoSectionForm() {
 
             <button
               type="submit"
-              disabled={saving}
               className="order-1 sm:order-2 flex items-center justify-center gap-2 px-10 py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save DO Entry"}
             </button>
           </div>
         </form>
