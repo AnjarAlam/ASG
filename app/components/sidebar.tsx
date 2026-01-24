@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth-store"; // ← import your store
 import {
   Home,
   Package,
@@ -25,6 +26,7 @@ import {
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuthStore(); // ← get user & auth state
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -33,7 +35,7 @@ export default function Sidebar() {
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
-        setCollapsed(false); // mobile always full width when open
+        setCollapsed(false);
       }
     };
 
@@ -42,17 +44,23 @@ export default function Sidebar() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const isAdmin = user?.role === "ADMIN"; // or "SUPER_ADMIN" if you have it
+
   const navItems = [
     { name: "Dashboard", icon: Home, path: "/dashboard/dash" },
     { name: "Inventory", icon: Package, path: "/dashboard/inventory" },
     { name: "Inward", icon: ArrowDownToLine, path: "/dashboard/inward" },
     { name: "Outward", icon: ArrowUpFromLine, path: "/dashboard/outward" },
     { name: "Labour Management", icon: HardHat, path: "/dashboard/labour" },
-    // { name: "Financer", icon: Wallet, path: "/dashboard/financer" },
     { name: "DO Report", icon: Wallet, path: "/dashboard/DOsection" },
     { name: "Reports", icon: BarChart3, path: "/dashboard/reports" },
     { name: "Chat", icon: MessageSquare, path: "/dashboard/chat" },
-    { name: "Users", icon: Users, path: "/dashboard/users" },
+
+    // Only show "Users" to admins
+    ...(isAdmin
+      ? [{ name: "Users", icon: Users, path: "/dashboard/users" }]
+      : []),
+
     { name: "Settings", icon: Settings, path: "/dashboard/settings" },
   ];
 
@@ -104,47 +112,52 @@ export default function Sidebar() {
         </div>
 
         {/* NAVIGATION */}
-       <nav className="
-  flex-1 px-3 py-6 space-y-1.5 
-  overflow-y-auto 
-  scrollbar-hide
-  [-ms-overflow-style:none]
-  [scrollbar-width:none]
-  [&::-webkit-scrollbar]:hidden
-">
-  {navItems.map((item) => {
-    const isActive = pathname.startsWith(item.path);
-    const Icon = item.icon;
-
-    return (
-      <Link
-        key={item.name}
-        href={item.path}
-        className={`
-          group flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium
-          transition-all duration-300 ease-in-out
-          ${isActive 
-            ? "bg-indigo-600/20 text-white border border-indigo-500/30" 
-            : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/40"}
-        `}
-        onClick={() => setMobileOpen(false)}
-      >
-        <Icon 
-          className={`w-5 h-5 flex-shrink-0 transition-colors duration-300
-            ${isActive ? "text-indigo-400" : "group-hover:text-indigo-400"}`} 
-        />
-        <span
-          className={`
-            transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden
-            ${collapsed ? "opacity-0 w-0" : "opacity-100 w-auto"}
-          `}
+        <nav
+          className="
+            flex-1 px-3 py-6 space-y-1.5 
+            overflow-y-auto 
+            scrollbar-hide
+            [-ms-overflow-style:none]
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+          "
         >
-          {item.name}
-        </span>
-      </Link>
-    );
-  })}
-</nav>
+          {navItems.map((item) => {
+            const isActive = pathname.startsWith(item.path);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.name}
+                href={item.path}
+                className={`
+                  group flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium
+                  transition-all duration-300 ease-in-out
+                  ${
+                    isActive
+                      ? "bg-indigo-600/20 text-white border border-indigo-500/30"
+                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/40"
+                  }
+                `}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon
+                  className={`w-5 h-5 flex-shrink-0 transition-colors duration-300
+                    ${isActive ? "text-indigo-400" : "group-hover:text-indigo-400"}`}
+                />
+                <span
+                  className={`
+                    transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden
+                    ${collapsed ? "opacity-0 w-0" : "opacity-100 w-auto"}
+                  `}
+                >
+                  {item.name}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+
         {/* BOTTOM ACTIONS */}
         <div className="px-5 pb-6 space-y-4 border-t border-gray-800/50 pt-4">
           <button
@@ -182,7 +195,11 @@ export default function Sidebar() {
       </aside>
 
       {/* Spacer for desktop layout */}
-      <div className={`hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collapsed ? "w-20" : "w-72"}`} />
+      <div
+        className={`hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          collapsed ? "w-20" : "w-72"
+        }`}
+      />
     </>
   );
 }

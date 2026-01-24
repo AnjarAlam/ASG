@@ -138,12 +138,10 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      // Optional: implement later when you have refresh endpoint
-      // refreshSession: async () => { ... }
     }),
 
     {
-      name: "auth-storage", // prefix of localStorage keys
+      name: "auth-storage", 
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

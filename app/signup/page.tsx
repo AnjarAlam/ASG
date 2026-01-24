@@ -1,10 +1,9 @@
-// app/signup/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, UserPlus } from "lucide-react";
+import { Eye, EyeOff, UserPlus, User, Mail, Phone, Lock } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function SignupPage() {
@@ -18,231 +17,204 @@ export default function SignupPage() {
     password: "",
     confirmPassword: "",
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
     setSuccess(false);
 
-    // Client-side validation
     if (formData.password !== formData.confirmPassword) {
-      setLocalError("Passwords do not match.");
+      setLocalError("Passwords do not match");
       return;
     }
 
     if (formData.password.length < 6) {
-      setLocalError("Password must be at least 6 characters.");
+      setLocalError("Password must be at least 6 characters");
       return;
     }
 
     if (!/^\d{10}$/.test(formData.mobileNumber)) {
-      setLocalError("Mobile number must be a valid 10-digit number.");
+      setLocalError("Mobile number must be 10 digits");
       return;
     }
 
-    try {
-      const success = await signup({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        mobileNumber: formData.mobileNumber.trim(),
-        password: formData.password,
-      });
+    const ok = await signup({
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      mobileNumber: formData.mobileNumber.trim(),
+      password: formData.password,
+    });
 
-      if (success) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push("/login");
-        }, 2500);
-      } else {
-        setLocalError("Signup failed. Email may already be registered or invalid.");
-      }
-    } catch (err) {
-      setLocalError("An error occurred. Please try again.");
-      console.error("Signup error:", err);
+    if (ok) {
+      setSuccess(true);
+      setTimeout(() => router.push("/login"), 2500);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black p-6">
-      <div className="w-full max-w-md bg-gray-900/90 border border-gray-800 rounded-2xl shadow-2xl backdrop-blur-sm overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white flex items-center justify-center px-4">
+      <div className="w-full max-w-3xl bg-gray-900/70 border border-gray-800 rounded-3xl shadow-2xl backdrop-blur-sm p-8 lg:p-12">
+
         {/* Header */}
-        <div className="p-8 text-center border-b border-gray-800">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-700 shadow-lg">
-            <UserPlus className="h-8 w-8 text-white" />
+        <div className="flex items-center gap-5 mb-10">
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <UserPlus className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Create Account</h1>
-          <p className="mt-2 text-gray-400">
-            Register to join the Coal Washary Management System
-          </p>
-        </div>
-
-        {/* Form */}
-        <div className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Success Message */}
-            {success && (
-              <div className="bg-green-950/50 border border-green-800/60 text-green-300 px-4 py-3 rounded-lg text-sm text-center">
-                Account created successfully! Redirecting to login...
-              </div>
-            )}
-
-            {/* Error Message */}
-            {(storeError || localError) && (
-              <div className="bg-red-950/50 border border-red-800/60 text-red-300 px-4 py-3 rounded-lg text-sm text-center">
-                {storeError || localError}
-              </div>
-            )}
-
-            {/* Name */}
-            <div className="space-y-2">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Enter your full name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="user@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                autoComplete="email"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all"
-              />
-            </div>
-
-            {/* Mobile Number */}
-            <div className="space-y-2">
-              <label htmlFor="mobileNumber" className="block text-sm font-medium text-gray-300">
-                Mobile Number
-              </label>
-              <input
-                id="mobileNumber"
-                name="mobileNumber"
-                type="tel"
-                placeholder="9895953546"
-                value={formData.mobileNumber}
-                onChange={handleChange}
-                required
-                pattern="[0-9]{10}"
-                title="Please enter a valid 10-digit mobile number"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all"
-              />
-            </div>
-
-            {/* Password */}
-            <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  minLength={6}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full py-3 px-4 rounded-lg font-medium text-white shadow-lg transition-all flex items-center justify-center gap-2
-                ${isLoading 
-                  ? "bg-indigo-800/70 cursor-wait" 
-                  : "bg-gradient-to-r from-indigo-600 to-violet-700 hover:brightness-110 active:scale-[0.98]"}
-              `}
-            >
-              {isLoading ? (
-                <>
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Creating account...
-                </>
-              ) : (
-                "Create Account"
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div className="mt-8 text-center text-sm text-gray-400">
-            <p>
-              Already have an account?{" "}
-              <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline">
-                Sign in
-              </Link>
+          <div>
+            <h1 className="text-3xl font-extrabold">Create Account</h1>
+            <p className="text-gray-400 text-sm mt-1">
+              Join the Coal Washary Management System
             </p>
           </div>
         </div>
+
+        {/* Messages */}
+        {success && (
+          <div className="mb-6 p-4 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-200 text-sm">
+            Account created successfully! Redirecting to login...
+          </div>
+        )}
+
+        {(storeError || localError) && (
+          <div className="mb-6 p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-200 text-sm">
+            {storeError || localError}
+          </div>
+        )}
+
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+        >
+          <Input
+            icon={<User size={18} />}
+            label="Full Name"
+            name="name"
+            value={formData.name}
+            onChange={(e: any) =>
+              setFormData((p) => ({ ...p, name: e.target.value }))
+            }
+            placeholder="John Doe"
+            required
+          />
+
+          <Input
+            icon={<Mail size={18} />}
+            label="Email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={(e: any) =>
+              setFormData((p) => ({ ...p, email: e.target.value }))
+            }
+            placeholder="user@example.com"
+            required
+          />
+
+          <Input
+            icon={<Phone size={18} />}
+            label="Mobile Number"
+            name="mobileNumber"
+            value={formData.mobileNumber}
+            onChange={(e: any) =>
+              setFormData((p) => ({ ...p, mobileNumber: e.target.value }))
+            }
+            placeholder="9876543210"
+            required
+          />
+
+          <div />
+
+          <PasswordInput
+            label="Password"
+            value={formData.password}
+            onChange={(v: string) =>
+              setFormData((p) => ({ ...p, password: v }))
+            }
+            show={showPassword}
+            setShow={setShowPassword}
+          />
+
+          <PasswordInput
+            label="Confirm Password"
+            value={formData.confirmPassword}
+            onChange={(v: string) =>
+              setFormData((p) => ({ ...p, confirmPassword: v }))
+            }
+            show={showConfirmPassword}
+            setShow={setShowConfirmPassword}
+          />
+
+          {/* Buttons */}
+          <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 pt-6">
+            <Link
+              href="/login"
+              className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-center transition"
+            >
+              Back to Login
+            </Link>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:brightness-110 rounded-xl font-medium shadow-lg shadow-indigo-500/25 transition disabled:opacity-60"
+            >
+              {isLoading ? "Creating..." : "Create Account"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
+
+/* ===================== Reusable Components ===================== */
+
+function Input({ icon, label, ...props }: any) {
+  return (
+    <div>
+      <label className="block mb-2 text-sm text-gray-400">{label}</label>
+      <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+          {icon}
+        </span>
+        <input
+          {...props}
+          className="w-full pl-11 pr-4 py-3 bg-gray-800/60 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition"
+        />
+      </div>
+    </div>
+  );
+}
+
+function PasswordInput({ label, value, onChange, show, setShow }: any) {
+  return (
+    <div>
+      <label className="block mb-2 text-sm text-gray-400">{label}</label>
+      <div className="relative">
+        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+          minLength={6}
+          className="w-full pl-11 pr-12 py-3 bg-gray-800/60 border border-gray-700 rounded-xl text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition"
+        />
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+    
