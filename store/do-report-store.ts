@@ -31,7 +31,7 @@ export interface DOReport {
   transportCharges: string;
 
   liftedQty: string;
-  liftedvehicleCount: string;
+  liftedVehicleCount: string;
 
   createdAt: string;
 }
@@ -54,7 +54,7 @@ export interface CreateDOReportPayload {
   transportCharges: string;
 
   liftedQty: string;
-  liftedvehicleCount: string;
+  liftedVehicleCount: string;
 }
 
 interface PaginationMeta {
@@ -86,6 +86,21 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+/* ✅ ADD THIS */
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    // 👆 change key if yours is accessToken / authToken
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
 
 /* =======================
    ZUSTAND STORE
@@ -154,6 +169,7 @@ export const useDOStore = create<DOStore>((set) => ({
       const res = await api.get(`/do-report/all`, {
         params: { page: 1, limit: 10 },
       });
+      console.log("res data", res);
 
       set({
         doReports: res.data.data,

@@ -101,36 +101,67 @@ export default function DoSectionForm() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e: any) => {
+  // const handleSubmit = async (e: any) => {
+  //   e.preventDefault();
+  //   if (!validate()) return;
+
+  //   const fd = new FormData();
+
+  //   fd.append("doNumber", formData.doNumber);
+  //   fd.append("supplier", formData.colliery);
+  //   fd.append("volume", formData.volumeMT);
+  //   fd.append("rate", formData.rateWithGST);
+
+  //   fd.append("financerName", formData.financerName);
+  //   fd.append("financerOrganization", formData.financerOrganization);
+  //   fd.append("financerCost", formData.financerCost);
+
+  //   fd.append("issueDate", formData.issueDate);
+  //   fd.append("expiryDate", formData.expiryDate);
+
+  //   fd.append("lifterName", formData.lifterName);
+  //   fd.append("lifterCharges", formData.lifterCharges);
+  //   fd.append("transportCharges", formData.transportCharges);
+  //   fd.append("liftedQty", formData.liftedQty);
+  //   fd.append("liftedvehicleCount", formData.liftedVehicleCount);
+
+  //   fd.append("remarks", formData.remarks);
+
+  //   formData.documents.forEach((f) => fd.append("documents", f));
+
+  //   await createDOReport(fd);
+  //   router.push("/dashboard/DOsection");
+  // };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!validate()) return;
 
-    const fd = new FormData();
+    const success = await createDOReport({
+      doNumber: formData.doNumber,
+      supplier: formData.colliery,
+      volume: formData.volumeMT,
+      rate: formData.rateWithGST,
 
-    fd.append("doNumber", formData.doNumber);
-    fd.append("supplier", formData.colliery);
-    fd.append("volume", formData.volumeMT);
-    fd.append("rate", formData.rateWithGST);
+      financerName: formData.financerName,
+      financerOrganization: formData.financerOrganization,
+      financerCost: formData.financerCost,
 
-    fd.append("financerName", formData.financerName);
-    fd.append("financerOrganization", formData.financerOrganization);
-    fd.append("financerCost", formData.financerCost);
+      issueDate: formData.issueDate,
+      expiryDate: formData.expiryDate,
 
-    fd.append("issueDate", formData.issueDate);
-    fd.append("expiryDate", formData.expiryDate);
+      lifterName: formData.lifterName,
+      lifterCharges: formData.lifterCharges,
+      transportCharges: formData.transportCharges,
 
-    fd.append("lifterName", formData.lifterName);
-    fd.append("lifterCharges", formData.lifterCharges);
-    fd.append("transportCharges", formData.transportCharges);
-    fd.append("liftedQty", formData.liftedQty);
-    fd.append("liftedvehicleCount", formData.liftedVehicleCount);
+      liftedQty: formData.liftedQty,
+      liftedVehicleCount: formData.liftedVehicleCount,
+    });
 
-    fd.append("remarks", formData.remarks);
-
-    formData.documents.forEach((f) => fd.append("documents", f));
-
-    await createDOReport(fd);
-    router.push("/dashboard/DOsection");
+    if (success) {
+      router.push("/dashboard/DOsection");
+    }
   };
 
   return (

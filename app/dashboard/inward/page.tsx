@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine,
@@ -19,120 +20,106 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import dayjs from "@/lib/dayjs";
+import { useInwardStore } from "@/store/inward-store";
 
 export default function InwardDashboard() {
   const router = useRouter();
-  const stats = {
-    totalVehiclesToday: 32,
-    totalCoalInwardToday: "1,428 MT",
-    averageNetWeight: "44.63 MT",
-    rejectedCoalToday: "98 MT",
-  };
-  const recentInwards = [
-    {
-      vehicle: "GJ-01-AB-1234",
-      supplier: "ABC Suppliers",
-      netWeight: "45.2 MT",
-      grade: "E",
-      type: "ROM",
-      size: "20-50",
-      area: "A",
-      time: "8 min ago",
-    },
-    {
-      vehicle: "GJ-05-CD-5678",
-      supplier: "XYZ Mining",
-      netWeight: "43.1 MT",
-      grade: "F",
-      type: "Steam",
-      size: "10-20",
-      area: "B",
-      time: "15 min ago",
-    },
-    {
-      vehicle: "GJ-12-EF-9012",
-      supplier: "Coal Corp",
-      netWeight: "46.8 MT",
-      grade: "B",
-      type: "Boulders",
-      size: "50-80",
-      area: "C",
-      time: "32 min ago",
-    },
-    {
-      vehicle: "GJ-03-GH-3456",
-      supplier: "National Coal Ltd",
-      netWeight: "44.0 MT",
-      grade: "E",
-      type: "Rejected",
-      size: "0-10",
-      area: "D",
-      time: "1 hr ago",
-    },
-  ];
-  const inwardTrend = [
-    { date: "Jan 03", A: 420, B: 380, C: 310, D: 130, E: 180, F: 90, G: 50 },
-    { date: "Jan 04", A: 510, B: 450, C: 380, D: 220, E: 210, F: 110, G: 70 },
-    { date: "Jan 05", A: 460, B: 390, C: 340, D: 150, E: 190, F: 100, G: 60 },
-    { date: "Jan 06", A: 580, B: 520, C: 410, D: 180, E: 240, F: 130, G: 80 },
-    { date: "Jan 07", A: 490, B: 430, C: 360, D: 200, E: 220, F: 120, G: 65 },
-    { date: "Jan 08", A: 540, B: 480, C: 390, D: 200, E: 230, F: 125, G: 75 },
-    { date: "Jan 09", A: 470, B: 410, C: 350, D: 198, E: 205, F: 115, G: 68 },
-  ];
-  const gradeDistribution = [
-    { grade: "E", value: 48 },
-    { grade: "F", value: 32 },
-    { grade: "B", value: 20 },
-  ];
 
-  // New sample data for recent tokens, mirroring the structure of recentInwards
-  // Token number formatted as "TO [Date] [Time] [Sequence]" e.g., "TO 2026-01-22 18:22 01"
-  const recentTokens = [
-    {
-      tokenNumber: "TO 2026-01-22 18:22 01",
-      vehicle: "GJ-01-AB-1234",
-      supplier: "ABC Suppliers",
-      netWeight: "45.2 MT",
-      grade: "E",
-      type: "ROM",
-      size: "20-50",
-      area: "A",
-      time: "8 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 18:07 02",
-      vehicle: "GJ-05-CD-5678",
-      supplier: "XYZ Mining",
-      netWeight: "43.1 MT",
-      grade: "F",
-      type: "Steam",
-      size: "10-20",
-      area: "B",
-      time: "15 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 17:50 03",
-      vehicle: "GJ-12-EF-9012",
-      supplier: "Coal Corp",
-      netWeight: "46.8 MT",
-      grade: "B",
-      type: "Boulders",
-      size: "50-80",
-      area: "C",
-      time: "32 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 17:22 04",
-      vehicle: "GJ-03-GH-3456",
-      supplier: "National Coal Ltd",
-      netWeight: "44.0 MT",
-      grade: "E",
-      type: "Rejected",
-      size: "0-10",
-      area: "D",
-      time: "1 hr ago",
-    },
-  ];
+  const { inwards, loading, fetchInwards, page, limit } = useInwardStore();
+
+  /* ===================== FETCH DATA ===================== */
+  useEffect(() => {
+    fetchInwards(1, 10);
+  }, []);
+
+  /* ===================== TODAY FILTER ===================== */
+  const today = dayjs().format("YYYY-MM-DD");
+
+  const todayInwards = useMemo(
+    () =>
+      inwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+      ),
+    [inwards],
+  );
+
+  /* ===================== STATS ===================== */
+  const stats = useMemo(() => {
+    const totalNet = todayInwards.reduce((sum, i) => sum + i.netWeight, 0);
+
+    return {
+      totalVehiclesToday: todayInwards.length,
+      totalCoalInwardToday: `${totalNet.toFixed(2)} MT`,
+      averageNetWeight: todayInwards.length
+        ? `${(totalNet / todayInwards.length).toFixed(2)} MT`
+        : "0 MT",
+      rejectedCoalToday: "—",
+    };
+  }, [todayInwards]);
+
+  /* ===================== RECENT INWARDS ===================== */
+  const recentInwards = useMemo(() => inwards.slice(0, 3), [inwards]);
+
+  /* ===================== GRADE DISTRIBUTION ===================== */
+  const gradeDistribution = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    todayInwards.forEach((i) => {
+      map[i.coalGrade] = (map[i.coalGrade] || 0) + i.netWeight;
+    });
+
+    return Object.entries(map).map(([grade, value]) => ({
+      grade,
+      value: Number(value.toFixed(2)),
+    }));
+  }, [todayInwards]);
+
+  /* ===================== INWARD TREND (LAST 7 DAYS) ===================== */
+  const inwardTrend = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }).map((_, i) =>
+      dayjs().subtract(6 - i, "day"),
+    );
+
+    return last7Days.map((day) => {
+      const dayData = inwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === day.format("YYYY-MM-DD"),
+      );
+
+      const areas = ["A", "B", "C", "D", "E", "F", "G"];
+
+      const row: any = {
+        date: day.format("MMM DD"),
+      };
+
+      areas.forEach((area) => {
+        row[area] = dayData
+          .filter((i) => i.area === area)
+          .reduce((sum, i) => sum + i.netWeight, 0);
+      });
+
+      return row;
+    });
+  }, [inwards]);
+
+  /* ===================== RECENT TOKENS ===================== */
+  const recentTokens = useMemo(
+    () =>
+      recentInwards.map((i, idx) => ({
+        tokenNumber: i.tokenNumber,
+        vehicle: i.vehicleNumber,
+        supplier: i.supplierName,
+        netWeight: `${i.netWeight} MT`,
+        grade: i.coalGrade,
+        type: i.coalType,
+        size: i.coalSize,
+        area: i.area,
+        time: dayjs(i.createdAt).fromNow(),
+      })),
+    [recentInwards],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-gray-100 pb-8">
@@ -161,11 +148,16 @@ export default function InwardDashboard() {
           </button>
         </div>
       </div>
+
+      {/* ================= REST OF JSX (UNCHANGED) ================= */}
+      {/* Everything below stays exactly the same UI-wise */}
+      {/* Uses stats, recentInwards, recentTokens, gradeDistribution, inwardTrend */}
+      {/* Your existing JSX continues here without modification */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 sm:space-y-10">
         {/* ================= KPI CARDS ================= */}
         <section>
           <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-200">
-            Today's Summary
+            Today&apos;s Summary
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {[
@@ -206,7 +198,6 @@ export default function InwardDashboard() {
           </div>
         </section>
 
-        
         {/* ================= CHARTS ================= */}
         <section className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8">
           {/* Recent Inwards */}
@@ -224,16 +215,16 @@ export default function InwardDashboard() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <p className="font-medium text-white text-sm sm:text-base">
-                        {entry.vehicle} • {entry.supplier}
+                        {entry.vehicleNumber} • {entry.supplier}
                       </p>
                       <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                        {entry.netWeight} • Grade {entry.grade} • {entry.type} •{" "}
-                        {entry.size}mm → Area {entry.area}
+                        {entry.netWeight} • Grade {entry.coalGrade} • {entry.coalType} •{" "}
+                        {entry.coalSize}mm → Area {entry.area}
                       </p>
                     </div>
                     <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
                       <Clock className="w-4 h-4" />
-                      {entry.time}
+                      {entry.inwardDateTime}
                     </div>
                   </div>
                 </div>
@@ -257,8 +248,9 @@ export default function InwardDashboard() {
                         {token.tokenNumber} • {token.vehicle}
                       </p>
                       <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                        {token.supplier} • {token.netWeight} • Grade {token.grade} • {token.type} •{" "}
-                        {token.size}mm → Area {token.area}
+                        {token.supplier} • {token.netWeight} • Grade{" "}
+                        {token.grade} • {token.type} • {token.size}mm → Area{" "}
+                        {token.area}
                       </p>
                     </div>
                     <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
@@ -270,11 +262,10 @@ export default function InwardDashboard() {
               ))}
             </div>
           </div>
-          
         </section>
 
         <section className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-1 lg:gap-8">
-         {/* Grade Distribution - Updated to indigo theme */}
+          {/* Grade Distribution - Updated to indigo theme */}
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
             <h3 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2.5">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
@@ -370,7 +361,7 @@ export default function InwardDashboard() {
             </div>
           </div>
         </section>
-        
+
         {/* ================= INWARD TREND ================= */}
         <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
           <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
