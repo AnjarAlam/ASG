@@ -21,7 +21,7 @@ export default function LoginPage() {
     const success = await login(formData.email.trim(), formData.password);
 
     if (success) {
-      router.push("/dashboard/labour");
+      router.push("/dashboard/dash");
     } else {
       setLocalError(authError || "Invalid email or password");
     }
@@ -106,20 +106,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 text-center text-sm text-gray-400 space-y-4">
-            <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-left">
-              <p className="font-medium mb-2 text-white">Test Accounts:</p>
-              <p className="text-xs mt-2">
-                <strong>Admin:</strong> admin@test.com <span className="text-gray-500">/ admin123</span>
-              </p>
-              <p className="text-xs mt-1">
-                <strong>Operator 1:</strong> staff@test.com <span className="text-gray-500">/ operator123</span>
-              </p>
-              <p className="text-xs mt-1">
-                <strong>Operator 2:</strong> staff2@test.com <span className="text-gray-500">/ operator456</span>
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
