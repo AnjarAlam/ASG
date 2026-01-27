@@ -56,7 +56,7 @@ export default function InwardEntryPage() {
               `}
             >
               <Globe className="h-4 w-4" />
-              Global
+              Local
             </button>
             <button
               onClick={() => setFormType("global")}
@@ -68,7 +68,7 @@ export default function InwardEntryPage() {
               `}
             >
               <Building className="h-4 w-4" />
-              Local
+              Global
             </button>
 
           </div>

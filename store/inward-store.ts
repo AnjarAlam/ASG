@@ -40,9 +40,9 @@ export interface Inward {
   area: string;
 
   // Weight
-  grossWeight: number;
-  tareWeight: number;
-  netWeight: number;
+  grossWeight: string;
+  tareWeight: string;
+  netWeight: string;
 
   overloadingWeight?: string;
   overloadingRate?: string;
@@ -102,6 +102,7 @@ export const useInwardStore = create<InwardState>((set, get) => ({
 
   /* ---------- CREATE (GLOBAL / LOCAL) ---------- */
   createInward: async (data) => {
+    console.log("creating")
     try {
       set({ loading: true, error: null });
 
@@ -109,6 +110,8 @@ export const useInwardStore = create<InwardState>((set, get) => ({
         data.inwardType === "LOCAL"
           ? "/inward/create-local-inward"
           : "/inward/create-inward";
+
+      console.log("endpoint", endpoint);
 
       await axios.post(endpoint, data);
 

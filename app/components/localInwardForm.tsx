@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine,
@@ -14,36 +14,67 @@ import {
   Upload,
   Trash2,
 } from "lucide-react";
+import { useInwardLocalStore } from "@/store/inward-local-store";
 
 export default function LocalInwardForm() {
   const router = useRouter();
+  const { createLocalInward, loading } = useInwardLocalStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     vehicleNumber: "",
+    supplierName: "",
+    tokenNumber: "",
     supplier: "",
-    dateTime: new Date().toISOString().slice(0, 16),
-    rstnumber: "",
-    grade: "E",
-    type: "ROM",
-    size: "0-10",
+    inwardDateTime: new Date().toISOString().slice(0, 16),
+    coalGrade: "E",
+    coalType: "ROM",
+    coalSize: "0-10",
     area: "A",
     grossWeight: "",
     tareWeight: "",
-    billNumber: "",
+    netWeight: "",
     notes: "",
     documents: [] as File[],
     images: [] as File[],
+    inwardType: "LOCAL",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  function generateToken(dateISO: string) {
+    const d = new Date(dateISO);
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+
+    const dateKey = `${yyyy}-${mm}-${dd}`;
+    const storageKey = `inward-counter-${dateKey}`;
+
+    let count = Number(localStorage.getItem(storageKey) || "0");
+    count += 1;
+
+    localStorage.setItem(storageKey, String(count));
+
+    return `${dateKey}:${hh}-${min}-${count}`;
+  }
+  useEffect(() => {
+    const token = generateToken(formData.inwardDateTime);
+    setFormData((prev) => ({
+      ...prev,
+      tokenNumber: token,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -85,18 +116,46 @@ export default function LocalInwardForm() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1400)); // simulate API
-    alert("Inward entry saved successfully!");
-    router.push("/dashboard/inward");
-    setSaving(false);
+    try {
+      const payload = {
+        vehicleNumber: formData.vehicleNumber,
+        tokenNumber: formData.tokenNumber,
+        vehicleSize: Number(formData.grossWeight) > 16000 ? "LARGE" : "SMALL",
+
+        supplierName: formData.supplier ? formData.supplier : formData.supplier,
+
+        supplier: formData.supplier ? "COLLIARY" : "PARTY",
+
+        inwardDateTime: new Date(formData.inwardDateTime).toISOString(),
+
+        coalGrade: formData.coalGrade,
+        coalType: formData.coalType,
+        coalSize: formData.coalSize,
+        area: formData.area,
+
+        grossWeight: Number(formData.grossWeight),
+        tareWeight: Number(formData.tareWeight),
+        netWeight: Number(formData.grossWeight) - Number(formData.tareWeight),
+
+        // ⚠️ STRINGS ONLY (DTO SAFE)
+        images: formData.images.map((img) => img.name),
+        documents: formData.documents.map((doc) => doc.name),
+      };
+
+      await createLocalInward(payload);
+
+      alert("Inward entry saved successfully!");
+      router.push("/dashboard/inward");
+    } catch (err) {
+      alert("Failed to save inward entry");
+    }
   };
 
   const netWeight =
     formData.grossWeight && formData.tareWeight
       ? Math.max(
           0,
-          Number(formData.grossWeight) - Number(formData.tareWeight)
+          Number(formData.grossWeight) - Number(formData.tareWeight),
         ).toFixed(2)
       : "—";
 
@@ -126,6 +185,15 @@ export default function LocalInwardForm() {
       {/* Form Content */}
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
+          <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-violet-500/30 rounded-xl px-6 py-4 shadow mb-6">
+            <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+              Token Number
+            </p>
+            <p className="text-lg font-bold text-violet-300">
+              {formData.tokenNumber || "Generating..."}
+            </p>
+          </div>
+
           {/* Vehicle + Supplier + Coal Details */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl order-1 flex flex-col">
@@ -139,12 +207,12 @@ export default function LocalInwardForm() {
                   <button
                     type="button"
                     onClick={() =>
-                      setFormData((prev) => ({ ...prev, isColliery: true }))
+                      setFormData((prev) => ({ ...prev, supplier: "COLLIARY" }))
                     }
                     className={`
                       px-5 py-2 rounded-full text-sm font-medium transition-all duration-300
                       ${
-                        formData.isColliery
+                        formData.supplier
                           ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
                           : "text-gray-300 hover:bg-gray-700/60"
                       }
@@ -156,12 +224,12 @@ export default function LocalInwardForm() {
                   <button
                     type="button"
                     onClick={() =>
-                      setFormData((prev) => ({ ...prev, isColliery: false }))
+                      setFormData((prev) => ({ ...prev, supplier: "PARTY" }))
                     }
                     className={`
                       px-5 py-2 rounded-full text-sm font-medium transition-all duration-300
                       ${
-                        !formData.isColliery
+                        !formData.supplier
                           ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
                           : "text-gray-300 hover:bg-gray-700/60"
                       }
@@ -202,30 +270,18 @@ export default function LocalInwardForm() {
                 <div className="relative">
                   <input
                     type="text"
-                    name={formData.isColliery ? "collieryName" : "partyName"}
-                    value={
-                      formData.isColliery
-                        ? formData.collieryName || ""
-                        : formData.partyName || ""
-                    }
-                    onChange={(e) => {
-                      const nameKey = formData.isColliery
-                        ? "collieryName"
-                        : "partyName";
-                      setFormData((prev) => ({
-                        ...prev,
-                        [nameKey]: e.target.value,
-                      }));
-                    }}
+                    name="supplierName"
+                    value={formData.supplierName}
+                    onChange={handleChange}
                     placeholder=" "
-                    className="peer w-full px-4 py-3.5  border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200"
+                    className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200"
                   />
                   <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                    {formData.isColliery ? "Colliery Name *" : "Party Name *"}
+                    {formData.supplierName ? "Colliery Name *" : "Party Name *"}
                   </label>
-                  {errors.collieryParty && (
+                  {errors.supplierName && (
                     <p className="text-red-400 text-xs mt-1.5">
-                      {errors.collieryParty}
+                      {errors.supplierName}
                     </p>
                   )}
                 </div>
@@ -235,7 +291,7 @@ export default function LocalInwardForm() {
                   <input
                     type="datetime-local"
                     name="dateTime"
-                    value={formData.dateTime}
+                    value={formData.inwardDateTime}
                     onChange={handleChange}
                     className="w-full px-4 py-3.5  border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white"
                   />
@@ -244,7 +300,7 @@ export default function LocalInwardForm() {
                   </label>
                 </div>
 
-                <div className="relative">
+                {/* <div className="relative">
                   <input
                     ref={firstInputRef}
                     type="text"
@@ -266,7 +322,7 @@ export default function LocalInwardForm() {
                       {errors.rstnumber}
                     </p>
                   )}
-                </div>
+                </div> */}
               </div>
             </section>
 
@@ -281,8 +337,8 @@ export default function LocalInwardForm() {
                 {/* Combined Grade & Type */}
                 <div className="relative">
                   <select
-                    name="coalGradeType"
-                    value={formData.coalGradeType || "E"}
+                    name="coalGrade"
+                    value={formData.coalGrade || "E"}
                     onChange={(e) => {
                       const value = e.target.value;
                       let grade = "E";
@@ -298,7 +354,7 @@ export default function LocalInwardForm() {
 
                       setFormData((prev) => ({
                         ...prev,
-                        coalGradeType: value,
+                        coalGrade: value,
                         grade,
                         type,
                       }));
@@ -317,8 +373,8 @@ export default function LocalInwardForm() {
                 {/* Size */}
                 <div className="relative">
                   <select
-                    name="size"
-                    value={formData.size}
+                    name="coalSize"
+                    value={formData.coalSize}
                     onChange={handleChange}
                     className="w-full px-4 py-3.5 bg-gray-900/60 border-b-2 border-gray-700 focus:border-indigo-500 rounded-md outline-none text-base text-white appearance-none"
                   >
@@ -364,51 +420,63 @@ export default function LocalInwardForm() {
               Weight Measurement
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
-              {[
-                {
-                  name: "grossWeight",
-                  label: "Gross Weight (kg) *",
-                  error: errors.grossWeight,
-                },
-                {
-                  name: "tareWeight",
-                  label: "Tare Weight (kg) *",
-                  error: errors.tareWeight,
-                },
-              ].map((field) => (
-                <div key={field.name} className="relative">
-                  <input
-                    type="number"
-                    name={field.name}
-                    value={formData[field.name as keyof typeof formData]}
-                    onChange={handleChange}
-                    placeholder=" "
-                    className={`peer w-full px-4 py-3.5 bg-transparent border-b-2 ${
-                      field.error
-                        ? "border-red-500"
-                        : "border-gray-700 focus:border-indigo-500"
-                    } rounded-md outline-none text-base sm:text-lg text-white placeholder-transparent transition-colors`}
-                  />
-                  <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs sm:text-sm font-medium text-gray-400 peer-focus:text-indigo-400 transition-all">
-                    {field.label}
-                  </label>
-                  {field.error && (
-                    <p className="text-red-400 text-xs mt-1.5">{field.error}</p>
-                  )}
-                </div>
-              ))}
-
-              {/* Net Weight - Readonly */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="relative">
                 <input
                   type="text"
-                  value={netWeight} 
-                  readOnly
-                  className="w-full px-4 py-3.5 bg-gray-900/40 border-b-2 border-gray-700 rounded-md outline-none text-base sm:text-lg text-gray-300 cursor-not-allowed"
+                  name="grossWeight"
+                  value={formData.grossWeight}
+                  onChange={handleChange}
+                  placeholder=" "
+                  className={`peer w-full px-4 py-3.5 border-b-2 ${
+                    errors.grossWeight
+                      ? "border-red-500"
+                      : "border-gray-700 focus:border-violet-500"
+                  } rounded-md outline-none text-lg font-medium text-white placeholder-transparent transition-colors duration-200`}
                 />
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs sm:text-sm font-medium text-gray-400">
-                  Net Weight (kg)
+                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
+                  Gross Weight (G) *
+                </label>
+                {errors.grossWeight && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {errors.grossWeight}
+                  </p>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  name="tareWeight"
+                  value={formData.tareWeight}
+                  onChange={handleChange}
+                  placeholder=" "
+                  className={`peer w-full px-4 py-3.5 border-b-2 ${
+                    errors.tareWeight
+                      ? "border-red-500"
+                      : "border-gray-700 focus:border-violet-500"
+                  } rounded-md outline-none text-lg font-medium text-white placeholder-transparent transition-colors duration-200`}
+                />
+                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
+                  Tare Weight (T) *
+                </label>
+                {errors.tareWeight && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {errors.tareWeight}
+                  </p>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  name="netWeight"
+                  value={formData.netWeight ? `${formData.netWeight} MT` : "—"}
+                  readOnly
+                  className="w-full px-4 py-3.5 bg-gray-900/50 border-b-2 border-gray-700 rounded-md outline-none text-lg font-bold text-emerald-300 cursor-not-allowed"
+                />
+                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400">
+                  Net Weight (N)
                 </label>
               </div>
             </div>
@@ -551,11 +619,11 @@ export default function LocalInwardForm() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={loading}
               className="order-1 sm:order-2 flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-indigo-600 to-violet-700 hover:from-indigo-700 hover:to-violet-800 text-white font-medium rounded-xl transition-all shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Entry"}
+              {loading ? "Saving..." : "Save Local Inward Entry"}
             </button>
           </div>
         </form>

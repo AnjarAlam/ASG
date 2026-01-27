@@ -12,32 +12,49 @@ import {
   Upload,
   Trash2,
 } from "lucide-react";
+import { useInwardStore, VehicleSize } from "@/store/inward-store";
 
 export default function LocalInwardForm() {
   const router = useRouter();
+  const { createInward, loading } = useInwardStore();
   const vehicleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
-    munshiyanaSize: "small",
-    munshiyanaPrice: "350",
-    rstnumber: "",
+    // ===== REQUIRED BACKEND FIELDS =====
     vehicleNumber: "",
-    collieryParty: "",
-    material: "ROM",
-    dateTime: new Date().toISOString().slice(0, 16),
+    tokenNumber: "",
+    vehicleSize: VehicleSize.SMALL,
+
+    supplierName: "",
+    supplier: "COLLIARY",
+
+    doNumber: "",
+    munshiana: "350",
+
+    inwardDateTime: new Date().toISOString(),
+
+    coalGrade: "E",
+    coalType: "ROM",
+    coalSize: "",
+    area: "",
+
     grossWeight: "",
     tareWeight: "",
     netWeight: "",
-    munshiyanaRemarks: "",
+
     overloadingWeight: "",
     overloadingRate: "",
     overloadingAmount: "",
-    notes: "",
-    documents: [] as File[],
+
+    rstNumber: "",
+    note: "",
+
     images: [] as File[],
-    isColliery: true,
+    documents: [] as File[],
+
+    inwardType: "GLOBAL",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -78,100 +95,135 @@ export default function LocalInwardForm() {
     );
   }
 
+  function generateToken(dateISO: string) {
+    const d = new Date(dateISO);
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+
+    const dateKey = `${yyyy}-${mm}-${dd}`;
+    const storageKey = `inward-counter-${dateKey}`;
+
+    let count = Number(localStorage.getItem(storageKey) || "0");
+    count += 1;
+
+    localStorage.setItem(storageKey, String(count));
+
+    return `${dateKey}:${hh}-${min}-${count}`;
+  }
+
   // Auto-focus first field
   useEffect(() => {
     vehicleInputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const token = generateToken(formData.inwardDateTime);
+    setFormData((prev) => ({
+      ...prev,
+      tokenNumber: token,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
+
     setFormData((prev) => {
-      const newData = { ...prev, [name]: value };
+      const next = { ...prev, [name]: value };
 
       if (name === "grossWeight" || name === "tareWeight") {
-        const gross = Number(newData.grossWeight) || 0;
-        const tare = Number(newData.tareWeight) || 0;
-        newData.netWeight = gross > tare ? (gross - tare).toFixed(2) : "";
+        const g = Number(next.grossWeight) || 0;
+        const t = Number(next.tareWeight) || 0;
+        next.netWeight = g > t ? (g - t).toFixed(2) : "";
       }
 
       if (name === "overloadingWeight" || name === "overloadingRate") {
-        const weight = Number(newData.overloadingWeight) || 0;
-        const rate = Number(newData.overloadingRate) || 0;
-        newData.overloadingAmount = (weight * rate).toFixed(2);
+        const w = Number(next.overloadingWeight) || 0;
+        const r = Number(next.overloadingRate) || 0;
+        next.overloadingAmount = (w * r).toFixed(2);
       }
 
-      return newData;
+      return next;
     });
-
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setFormData((prev) => ({
-        ...prev,
-        documents: [...prev.documents, ...newFiles],
-      }));
-    }
+    if (!e.target.files) return;
+    setFormData((p) => ({
+      ...p,
+      documents: [...p.documents, ...Array.from(e.target.files)],
+    }));
   };
 
   const removeFile = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index),
+    setFormData((p) => ({
+      ...p,
+      documents: p.documents.filter((_, i) => i !== index),
     }));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    const remaining = 3 - formData.images.length;
+    if (remaining <= 0) return;
 
-    const selectedImages = Array.from(e.target.files);
-    const remainingSlots = 3 - formData.images.length;
-
-    if (remainingSlots <= 0) return;
-
-    setFormData((prev) => ({
-      ...prev,
-      images: [...prev.images, ...selectedImages.slice(0, remainingSlots)],
+    setFormData((p) => ({
+      ...p,
+      images: [...p.images, ...files.slice(0, remaining)],
     }));
   };
 
   const removeImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
+    setFormData((p) => ({
+      ...p,
+      images: p.images.filter((_, i) => i !== index),
     }));
   };
-
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+    const e: Record<string, string> = {};
 
-    if (!formData.vehicleNumber.trim()) newErrors.vehicleNumber = "Required";
-    if (!formData.collieryParty.trim()) newErrors.collieryParty = "Required";
-    if (!formData.rstnumber.trim()) newErrors.rstnumber = "Required";
+    if (!formData.vehicleNumber) e.vehicleNumber = "Required";
+    if (!formData.supplierName) e.supplierName = "Required";
+    if (!formData.rstNumber) e.rstNumber = "Required";
+    if (!formData.coalSize) e.coalSize = "Required";
+    if (!formData.area) e.area = "Required";
+
     if (!formData.grossWeight || Number(formData.grossWeight) <= 0)
-      newErrors.grossWeight = "Enter valid gross weight";
+      e.grossWeight = "Invalid";
     if (!formData.tareWeight || Number(formData.tareWeight) < 0)
-      newErrors.tareWeight = "Enter valid tare weight";
+      e.tareWeight = "Invalid";
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    alert("Local Inward entry saved successfully!");
+    const payload = {
+      ...formData,
+      tokenNumber: formData.tokenNumber,
+      grossWeight: String(formData.grossWeight),
+      tareWeight: String(formData.tareWeight),
+      netWeight: String(formData.netWeight),
+      overloadingWeight: String(formData.overloadingWeight || 0),
+      overloadingRate: String(formData.overloadingRate || 0),
+      overloadingAmount: String(formData.overloadingAmount || 0),
+      images: formData.images.map((file) => file.name),
+      documents: formData.documents.map((file) => file.name),
+    };
+
+    await createInward(payload);
     router.push("/dashboard/inward");
-    setSaving(false);
   };
 
   return (
@@ -179,6 +231,17 @@ export default function LocalInwardForm() {
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Vehicle & Basic Information */}
+
+          {/* Token Number */}
+          <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-violet-500/30 rounded-xl px-6 py-4 shadow mb-6">
+            <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+              Token Number
+            </p>
+            <p className="text-lg font-bold text-violet-300">
+              {formData.tokenNumber || "Generating..."}
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7 pb-4 border-b border-gray-700/50">
@@ -190,9 +253,11 @@ export default function LocalInwardForm() {
                 <div className="inline-flex rounded-full bg-gray-800/70 p-1.5 border border-gray-700/60 backdrop-blur-sm">
                   <button
                     type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, isColliery: true }))}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, supplier: "COLLIARY" }))
+                    }
                     className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                      formData.isColliery
+                      formData.supplier
                         ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
                         : "text-gray-300 hover:bg-gray-700/60"
                     }`}
@@ -202,9 +267,11 @@ export default function LocalInwardForm() {
 
                   <button
                     type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, isColliery: false }))}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, supplier: "PARTY" }))
+                    }
                     className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                      !formData.isColliery
+                      !formData.supplier
                         ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
                         : "text-gray-300 hover:bg-gray-700/60"
                     }`}
@@ -224,40 +291,55 @@ export default function LocalInwardForm() {
                     onChange={handleChange}
                     placeholder=" "
                     className={`peer w-full px-4 py-3.5 border-b-2 ${
-                      errors.vehicleNumber ? "border-red-500" : "border-gray-700 focus:border-violet-500"
+                      errors.vehicleNumber
+                        ? "border-red-500"
+                        : "border-gray-700 focus:border-violet-500"
                     } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
                   />
                   <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
                     Vehicle Number *
                   </label>
-                  {errors.vehicleNumber && <p className="text-red-400 text-xs mt-1.5">{errors.vehicleNumber}</p>}
+                  {errors.vehicleNumber && (
+                    <p className="text-red-400 text-xs mt-1.5">
+                      {errors.vehicleNumber}
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative">
                   <input
                     type="text"
-                    name="collieryParty"
-                    value={formData.collieryParty}
+                    name="supplierName"
+                    value={formData.supplierName}
                     onChange={handleChange}
                     placeholder=" "
                     className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200"
                   />
                   <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                    {formData.isColliery ? "Colliery Name *" : "Party Name *"}
+                    {formData.supplierName ? "Colliery Name *" : "Party Name *"}
                   </label>
-                  {errors.collieryParty && <p className="text-red-400 text-xs mt-1.5">{errors.collieryParty}</p>}
+                  {errors.supplierName && (
+                    <p className="text-red-400 text-xs mt-1.5">
+                      {errors.supplierName}
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative">
                   <input
-                    type="datetime-local"
-                    name="dateTime"
-                    value={formData.dateTime}
+                    type="text"
+                    name="doNumber"
+                    value={formData.doNumber}
                     onChange={handleChange}
-                    className="w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white"
+                    placeholder=" "
+                    className={`peer w-full px-4 py-3.5 border-b-2 ${
+                      errors.doNumber
+                        ? "border-red-500"
+                        : "border-gray-700 focus:border-violet-500"
+                    } rounded-md outline-none text-lg font-medium text-white placeholder-transparent transition-colors duration-200`}
                   />
                   <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                    Date & Time
+                    Do Number *
                   </label>
                 </div>
 
@@ -265,18 +347,24 @@ export default function LocalInwardForm() {
                   <input
                     ref={firstInputRef}
                     type="text"
-                    name="rstnumber"
-                    value={formData.rstnumber}
+                    name="rstNumber"
+                    value={formData.rstNumber}
                     onChange={handleChange}
                     placeholder=" "
                     className={`peer w-full px-4 py-3.5 border-b-2 ${
-                      errors.rstnumber ? "border-red-500" : "border-gray-700 focus:border-violet-500"
+                      errors.rstNumber
+                        ? "border-red-500"
+                        : "border-gray-700 focus:border-violet-500"
                     } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
                   />
                   <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
                     RST Number *
                   </label>
-                  {errors.rstnumber && <p className="text-red-400 text-xs mt-1.5">{errors.rstnumber}</p>}
+                  {errors.rstNumber && (
+                    <p className="text-red-400 text-xs mt-1.5">
+                      {errors.rstNumber}
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
@@ -291,14 +379,20 @@ export default function LocalInwardForm() {
               <div className="grid grid-cols-1 sm:grid-cols-1 gap-6 lg:gap-8">
                 <div className="relative">
                   <select
-                    name="coalGradeType"
-                    value={formData.coalGradeType || "E"}
+                    name="coalGrade"
+                    value={formData.coalGrade || "E"}
                     onChange={(e) => {
                       const value = e.target.value;
                       let grade = "E";
                       let type = "ROM";
-                      if (value === "F") { grade = "F"; type = "Steam"; }
-                      if (value === "B") { grade = "B"; type = "Boulders"; }
+                      if (value === "F") {
+                        grade = "F";
+                        type = "Steam";
+                      }
+                      if (value === "B") {
+                        grade = "B";
+                        type = "Boulders";
+                      }
                       setFormData((prev) => ({
                         ...prev,
                         coalGradeType: value,
@@ -318,8 +412,8 @@ export default function LocalInwardForm() {
 
                 <div className="relative">
                   <select
-                    name="size"
-                    value={formData.size || ""}
+                    name="coalSize"
+                    value={formData.coalSize || ""}
                     onChange={handleChange}
                     className="w-full px-4 py-3.5 bg-gray-900/60 border-b-2 border-gray-700 focus:border-indigo-500 rounded-md outline-none text-base text-white appearance-none"
                   >
@@ -355,6 +449,18 @@ export default function LocalInwardForm() {
                     Area
                   </label>
                 </div>
+                <div className="relative">
+                  <input
+                    type="datetime-local"
+                    name="inwardDateTime"
+                    value={formData.inwardDateTime}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-base text-white"
+                  />
+                  <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
+                    Date & Time
+                  </label>
+                </div>
               </div>
             </section>
           </div>
@@ -375,13 +481,19 @@ export default function LocalInwardForm() {
                   onChange={handleChange}
                   placeholder=" "
                   className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.grossWeight ? "border-red-500" : "border-gray-700 focus:border-violet-500"
+                    errors.grossWeight
+                      ? "border-red-500"
+                      : "border-gray-700 focus:border-violet-500"
                   } rounded-md outline-none text-lg font-medium text-white placeholder-transparent transition-colors duration-200`}
                 />
                 <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
                   Gross Weight (G) *
                 </label>
-                {errors.grossWeight && <p className="text-red-400 text-xs mt-1.5">{errors.grossWeight}</p>}
+                {errors.grossWeight && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {errors.grossWeight}
+                  </p>
+                )}
               </div>
 
               <div className="relative">
@@ -392,13 +504,19 @@ export default function LocalInwardForm() {
                   onChange={handleChange}
                   placeholder=" "
                   className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.tareWeight ? "border-red-500" : "border-gray-700 focus:border-violet-500"
+                    errors.tareWeight
+                      ? "border-red-500"
+                      : "border-gray-700 focus:border-violet-500"
                   } rounded-md outline-none text-lg font-medium text-white placeholder-transparent transition-colors duration-200`}
                 />
                 <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
                   Tare Weight (T) *
                 </label>
-                {errors.tareWeight && <p className="text-red-400 text-xs mt-1.5">{errors.tareWeight}</p>}
+                {errors.tareWeight && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {errors.tareWeight}
+                  </p>
+                )}
               </div>
 
               <div className="relative">
@@ -416,7 +534,7 @@ export default function LocalInwardForm() {
           </section>
 
           {/* Munshiyana */}
-          <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
+          <section className="w-full bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-700/50 mb-6">
               <h2 className="text-xl font-bold flex items-center gap-3">
                 <Scale className="h-6 w-6 text-violet-400" />
@@ -430,14 +548,14 @@ export default function LocalInwardForm() {
                     onClick={() =>
                       setFormData((prev) => ({
                         ...prev,
-                        munshiyanaSize: "small",
+                        VehicleSize: "SMALL",
                         munshiyanaPrice: "350",
                       }))
                     }
                     className={`
                       relative px-5 py-1.5 text-sm font-medium rounded-full transition-all duration-300
                       ${
-                        formData.munshiyanaSize === "small"
+                        formData.vehicleSize === "SMALL"
                           ? "bg-violet-600 text-white shadow-md scale-105"
                           : "text-gray-300 hover:text-white hover:bg-gray-700/50"
                       }
@@ -451,14 +569,14 @@ export default function LocalInwardForm() {
                     onClick={() =>
                       setFormData((prev) => ({
                         ...prev,
-                        munshiyanaSize: "large",
+                        VehicleSize: "LARGE",
                         munshiyanaPrice: "1000",
                       }))
                     }
                     className={`
                       relative px-5 py-1.5 text-sm font-medium rounded-full transition-all duration-300
                       ${
-                        formData.munshiyanaSize === "large"
+                        formData.vehicleSize === "LARGE"
                           ? "bg-violet-600 text-white shadow-md scale-105"
                           : "text-gray-300 hover:text-white hover:bg-gray-700/50"
                       }
@@ -478,14 +596,14 @@ export default function LocalInwardForm() {
                   </span>
                   <input
                     type="text"
-                    name="munshiyanaPrice"
-                    value={formData.munshiyanaPrice || ""}
+                    name="munshiana"
+                    value={formData.munshiana || ""}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === "" || /^\d+(\.\d{0,2})?$/.test(val)) {
                         setFormData((prev) => ({
                           ...prev,
-                          munshiyanaPrice: val,
+                          munshiana: val,
                         }));
                       }
                     }}
@@ -501,7 +619,7 @@ export default function LocalInwardForm() {
               <div className="relative">
                 <textarea
                   name="munshiyanaRemarks"
-                  value={formData.munshiyanaRemarks || ""}
+                  value={formData.note || ""}
                   onChange={handleChange}
                   rows={3}
                   placeholder="Remarks for Munshiyana (optional)"
@@ -680,7 +798,7 @@ export default function LocalInwardForm() {
 
               <textarea
                 name="notes"
-                value={formData.notes}
+                value={formData.note}
                 onChange={handleChange}
                 rows={6}
                 placeholder="Quality issues, special instructions, overloading remarks, observations..."
@@ -702,11 +820,11 @@ export default function LocalInwardForm() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={loading}
               className="order-1 sm:order-2 flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-700 hover:brightness-110 text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Local Inward Entry"}
+              {loading ? "Saving..." : "Save Inward Entry"}
             </button>
           </div>
         </form>
