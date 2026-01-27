@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import { Scale, Trash2, PlusCircle } from "lucide-react";
+import { useOutwardStore } from "../../store/outward-store"; // ← adjust path
 
 interface BillingMethodProps {
   formData: any;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   handleChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => void;
 }
 
@@ -28,19 +29,22 @@ export default function BillingMethodSection({
   setFormData,
   handleChange,
 }: BillingMethodProps) {
-  // Show top fields unless "different" or "weight" is selected without "half"
+  const { loading: storeLoading } = useOutwardStore();
+
+  // Show top global fields unless only "different" or "weight" is selected
   const showTopFields = !(
     (formData.billingMethods?.includes("different") || formData.billingMethods?.includes("weight")) &&
     !formData.billingMethods?.includes("half")
   );
 
   // ────────────────────────────────────────────────
-  //  HALF BILLING REAL-TIME CALCULATION
+  //  HALF BILLING – real-time calculation
   // ────────────────────────────────────────────────
   useEffect(() => {
     if (!formData.billingMethods?.includes("half")) return;
 
-    const totalCoal   = Number(formData.totalWeight)   || 0;
+    // Fallback if global values missing
+    const totalCoal   = Number(formData.totalWeight || formData.netWeight) || 0;
     const billingRate = Number(formData.billingRate) || 0;
     const actualRate  = Number(formData.actualRate)  || 0;
     const gstRate     = Number(formData.gstRate ?? 18);
@@ -51,7 +55,7 @@ export default function BillingMethodSection({
     const gstAmount      = billingBase * (gstRate / 100);
     const billingWithGst = billingBase + gstAmount;
 
-    const cashAmount     = totalCoal * (actualRate - billingRate);
+    const cashAmount     = totalCoal * (actualRate - billingRate); // cash difference
 
     const tcsAmount = billingWithGst * 0.01; // TCS 1% on incl. GST
 
@@ -68,13 +72,14 @@ export default function BillingMethodSection({
   }, [
     formData.billingMethods,
     formData.totalWeight,
+    formData.netWeight,
     formData.billingRate,
     formData.actualRate,
     formData.gstRate,
   ]);
 
   // ────────────────────────────────────────────────
-  //  HALF WEIGHT BILLING – per line billing & actual rate + TCS
+  //  HALF WEIGHT BILLING – multiple lines
   // ────────────────────────────────────────────────
   useEffect(() => {
     if (!formData.billingMethods?.includes("weight") || !Array.isArray(formData.weight?.lines)) return;
@@ -86,16 +91,18 @@ export default function BillingMethodSection({
     const gstRate = Number(formData.gstRate ?? 18);
 
     for (const line of formData.weight.lines) {
-      const weight = Number(line.loading) || 0;
+      const weight      = Number(line.loading) || 0;
       const billingRate = Number(line.billingRate) || 0;
-      const actualRate = Number(line.actualRate) || 0;
+      const actualRate  = Number(line.actualRate) || 0;
+
+      if (weight <= 0) continue;
 
       const billingBase = weight * billingRate;
       const gst = billingBase * (gstRate / 100);
-      const billingWithGst = billingBase + gst;
+      const withGst = billingBase + gst;
       const cash = weight * (actualRate - billingRate);
 
-      totalBillingWithGst += billingWithGst;
+      totalBillingWithGst += withGst;
       totalCashAmount += cash;
       totalGstAmount += gst;
     }
@@ -119,7 +126,7 @@ export default function BillingMethodSection({
   ]);
 
   // ────────────────────────────────────────────────
-  //  DIFFERENT MATERIAL BILLING – with TCS
+  //  DIFFERENT MATERIAL BILLING – multiple materials
   // ────────────────────────────────────────────────
   useEffect(() => {
     if (
@@ -135,9 +142,11 @@ export default function BillingMethodSection({
     const gstRate = Number(formData.gstRate ?? 18);
 
     for (const mat of formData.different.materials) {
-      const qty = Number(mat.quantity) || 0;
+      const qty         = Number(mat.quantity) || 0;
       const billingRate = Number(mat.billingRate) || 0;
-      const actualRate = Number(mat.actualRate) || 0;
+      const actualRate  = Number(mat.actualRate) || 0;
+
+      if (qty <= 0) continue;
 
       const base = qty * billingRate;
       const gst = base * (gstRate / 100);
@@ -172,6 +181,7 @@ export default function BillingMethodSection({
 
     setFormData((prev: any) => {
       const newData = { ...prev };
+      newData.billingMethods = [...(prev.billingMethods || []), value];
 
       if (value === "half") {
         newData.half = {
@@ -198,10 +208,7 @@ export default function BillingMethodSection({
         };
       }
 
-      return {
-        ...newData,
-        billingMethods: [...(prev.billingMethods || []), value],
-      };
+      return newData;
     });
   };
 
@@ -212,28 +219,26 @@ export default function BillingMethodSection({
       if (method === "weight") delete newData.weight;
       if (method === "different") delete newData.different;
 
-      return {
-        ...newData,
-        billingMethods: prev.billingMethods?.filter((m: string) => m !== method) || [],
-      };
+      newData.billingMethods = prev.billingMethods?.filter((m: string) => m !== method) || [];
+      return newData;
     });
   };
 
   return (
-    <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
+    <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg relative">
       <h2 className="text-xl font-bold mb-7 flex items-center gap-3 pb-4 border-b border-gray-700/50">
         <Scale className="h-6 w-6 text-violet-400" />
         Billing & Rates
       </h2>
 
-      {/* Top global inputs */}
+      {/* Top global inputs – shown unless only weight/different */}
       {showTopFields && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <div className="relative">
             <input
               type="text"
               name="totalWeight"
-              value={formData.totalWeight || ""}
+              value={formData.totalWeight || formData.netWeight || ""}
               onChange={handleChange}
               className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white bg-transparent"
               placeholder=" "
@@ -364,7 +369,6 @@ export default function BillingMethodSection({
                   TCS @1%: ₹{Number(formData.half?.tcsAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </p>
               </div>
-
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-6">
@@ -558,7 +562,6 @@ export default function BillingMethodSection({
                   TCS @1%: ₹{Number(formData.weight?.tcsAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </p>
               </div>
-
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-6">
@@ -799,7 +802,6 @@ export default function BillingMethodSection({
                   TCS @1%: ₹{Number(formData.different?.tcsAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </p>
               </div>
-
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-6">
@@ -809,7 +811,7 @@ export default function BillingMethodSection({
         )}
       </div>
 
-      {/* Add Billing Method – bottom right */}
+      {/* Add Billing Method – bottom right fixed on mobile */}
       <div className="fixed bottom-6 right-6 z-10 md:static md:flex md:justify-end">
         <div className="bg-gray-900/90 backdrop-blur-sm border border-violet-700/40 rounded-xl shadow-2xl p-4 w-80 md:w-auto">
           <h3 className="text-sm font-medium mb-3 text-violet-300 flex items-center gap-2">
@@ -819,7 +821,8 @@ export default function BillingMethodSection({
           <select
             value=""
             onChange={(e) => addMethod(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 focus:border-violet-500 rounded-md outline-none text-white appearance-none"
+            disabled={storeLoading}
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 focus:border-violet-500 rounded-md outline-none text-white appearance-none disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <option value="">Select method...</option>
             {billingOptions
