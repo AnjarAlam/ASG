@@ -1,13 +1,12 @@
 "use client";
 
 import { create } from "zustand";
-import axios from "axios";
+import axios from "@/lib/axios";
 
 /* ======================
    API CONFIG
 ====================== */
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /* ======================
    TYPES (DTO MATCH)
@@ -22,7 +21,7 @@ export type InwardType = "GLOBAL" | "LOCAL";
 export interface CreateLocalInwardPayload {
   vehicleNumber: string;
   tokenNumber: string;
-  vehicleSize: VehicleSize;
+  // vehicleSize: VehicleSize;
   supplierName: string;
   supplier: string;
   inwardDateTime: string;
@@ -59,18 +58,11 @@ export const useInwardLocalStore = create<InwardLocalStore>((set) => ({
   error: null,
 
   createLocalInward: async (payload) => {
+    console.log("Creating local inward with payload:", payload);
     try {
       set({ loading: true, error: null });
 
-      await axios.post(
-        `${API_BASE_URL}/inward/create-local-inward`,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await axios.post(`${API_BASE_URL}/inward/create-local-inward`, payload);
 
       set({ loading: false });
     } catch (err: any) {
@@ -79,8 +71,7 @@ export const useInwardLocalStore = create<InwardLocalStore>((set) => ({
       set({
         loading: false,
         error:
-          err?.response?.data?.message ||
-          "Failed to create local inward entry",
+          err?.response?.data?.message || "Failed to create local inward entry",
       });
 
       throw err;
