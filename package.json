@@ -10,13 +10,8 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
-<<<<<<< HEAD
     "dayjs": "^1.11.19",
     "date-fns": "^4.1.0",
-=======
-    "date-fns": "^4.1.0",
-    "dayjs": "^1.11.19",
->>>>>>> 5dd71a86a772a67ec69b8fd79659923aeedde447
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "react": "19.2.3",
