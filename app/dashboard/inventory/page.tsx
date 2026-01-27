@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import {
   Layers,
   Building2,
@@ -27,68 +28,145 @@ import {
   Legend,
 } from "recharts";
 
-/* ================= DATA ================= */
+import { useInventoryStore } from "@/store/inventory-store"; // adjust path
+import { useInwardStore } from "@/store/inward-store";
+import dayjs from "dayjs";
 
-const kpis = [
-  { label: "Total Stock", value: "1,040 MT", icon: Warehouse },
-  { label: "Active Areas", value: "7", icon: Building2 },
-  { label: "Rejected Coal", value: "98 MT", icon: AlertTriangle },
-  { label: "Vehicle Movements", value: "64", icon: Truck },
-  { label: "Avg Stock / Area", value: "149 MT", icon: Gauge },
-  { label: "Turnover Rate", value: "78%", icon: PackageCheck },
-];
-
-const areaStock = [
-  { area: "A", qty: 120 },
-  { area: "B", qty: 180 },
-  { area: "C", qty: 95 },
-  { area: "D", qty: 210 },
-  { area: "E", qty: 160 },
-  { area: "F", qty: 75 },
-  { area: "G", qty: 60 },
-];
-
-const gradeDistribution = [
-  { name: "Grade E", value: 48 },
-  { name: "Grade F", value: 32 },
-  { name: "Grade B", value: 20 },
-];
-
-const COLORS = ["#6366f1", "#a855f7", "#c084fc"];
-
-const inventoryRows = [
-  { area: "A", grade: "E", type: "ROM", size: "20–50", qty: 120 },
-  { area: "B", grade: "F", type: "Steam", size: "50–80", qty: 180 },
-  { area: "C", grade: "B", type: "Boulders", size: "50–80", qty: 95 },
-  { area: "D", grade: "E", type: "ROM", size: "20–50", qty: 210 },
-  { area: "E", grade: "F", type: "Steam", size: "50–80", qty: 160 },
-  { area: "F", grade: "B", type: "Boulders", size: "10–20", qty: 75 },
-  { area: "G", grade: "E", type: "ROM", size: "20–50", qty: 60 },
-];
-
-/* ================= PAGE ================= */
+const COLORS = ["#6366f1", "#a855f7", "#c084fc", "#f472b6", "#fb923c"];
 
 export default function InventoryDashboard() {
+  const {
+    inventory,
+    areaSummaries,
+    totalStockMT,
+    activeAreasCount,
+    rejectedCoalMT,
+    loading,
+    error,
+    fetchAllInventory,
+    fetchAreaWiseSummary,
+    // fetchGradeSizeSummary,
+  } = useInventoryStore();
+  const { inwards, fetchInwards } = useInwardStore();
+
+  // Load data on mount
+  useEffect(() => {
+    fetchAllInventory();
+    fetchAreaWiseSummary();
+    fetchInwards(1, Number.MAX_SAFE_INTEGER);
+    // fetchGradeSizeSummary(); // if needed
+  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards]);
+  console.log("inventory", inventory);
+
+  const today = dayjs().format("YYYY-MM-DD");
+
+  const todayInwards = useMemo(
+    () =>
+      inwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+      ),
+    [inwards],
+  );
+
+  // Prepare chart data
+  const areaStock = areaSummaries.map((s) => ({
+    area: s._id,
+    qty: Math.round(s.totalQuantity),
+  }));
+  console.log("area", areaStock);
+
+  // For grade distribution – computed from inventory (or use gradeSizeSummaries)
+  const gradeDistribution = [
+    { name: "Grade E", value: 0 },
+    { name: "Grade F", value: 0 },
+    { name: "Grade B", value: 0 },
+  ];
+  console.log("grade", gradeDistribution);
+
+  inventory.forEach((item) => {
+    if (item.grade === "E") gradeDistribution[0].value += item.quantityMT;
+    if (item.grade === "F") gradeDistribution[1].value += item.quantityMT;
+    if (item.grade === "B") gradeDistribution[2].value += item.quantityMT;
+  });
+
+  // Format numbers nicely
+  const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        <div className="text-xl">Loading inventory...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-400">
+        <div className="text-xl">Error: {error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
       <main className="max-w-[1600px] mx-auto px-4 lg:px-6 py-8 space-y-8">
-        {/* ===== HEADER ===== */}
+        {/* HEADER */}
         <header className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 shadow-lg shadow-indigo-900/40">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 shadow-lg shadow-indigo-900/40">
             <Home className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold">Inventory Overview</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold">
+              Inventory Overview
+            </h1>
             <p className="text-sm text-gray-400 mt-1">
               Live stock • areas • grades • distribution
             </p>
           </div>
         </header>
 
-        {/* ===== KPI GRID ===== */}
+        {/* KPI GRID */}
         <section>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {kpis.map((k) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {[
+              {
+                label: "Total Stock",
+                value: formatMT(totalStockMT),
+                icon: Warehouse,
+              },
+              {
+                label: "Active Areas",
+                value: activeAreasCount.toString(),
+                icon: Building2,
+              },
+              // {
+              //   label: "Rejected Coal",
+              //   value: formatMT(rejectedCoalMT),
+              //   icon: AlertTriangle,
+              // },
+              {
+                label: "Inward Movements",
+                value: todayInwards.length,
+                icon: (props: any) => (
+                  <Truck
+                    {...props}
+                    className="scale-x-[-1.05] text-indigo-400 scale-y-125"
+                  />
+                ),
+              }, // ← placeholder – add real data later
+              { label: "OutWard Movements", value: "64", icon: Truck }, // ← placeholder – add real data later
+              {
+                label: "Avg Stock / Area",
+                value:
+                  activeAreasCount > 0
+                    ? formatMT(Math.round(totalStockMT / activeAreasCount))
+                    : "0 MT",
+                icon: Gauge,
+              },
+              // { label: "Turnover Rate", value: "78%", icon: PackageCheck }, // ← placeholder
+            ].map((k) => (
               <div
                 key={k.label}
                 className="h-24 bg-gray-900/70 border border-gray-800 rounded-xl p-4 flex items-center justify-between hover:border-indigo-500/40 transition-all duration-200"
@@ -103,10 +181,9 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* ===== CHART SECTION ===== */}
+        {/* CHARTS */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Area-wise Stock - Bigger chart */}
-          <div className="lg:col-span-2 bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all duration-300">
+          <div className="lg:col-span-2 bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all">
             <h3 className="font-semibold mb-2 flex items-center gap-2">
               <Building2 className="text-indigo-400" />
               Area-wise Coal Stock (MT)
@@ -122,8 +199,7 @@ export default function InventoryDashboard() {
             </ResponsiveContainer>
           </div>
 
-          {/* Grade Distribution (Pie) */}
-          <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all duration-300">
+          <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all">
             <h3 className="font-semibold mb-2 flex items-center gap-2">
               <BarChart3 className="text-indigo-400" />
               Grade Distribution
@@ -133,12 +209,13 @@ export default function InventoryDashboard() {
                 <Pie
                   data={gradeDistribution}
                   dataKey="value"
+                  nameKey="name"
                   innerRadius={55}
                   outerRadius={85}
                   label
                 >
                   {gradeDistribution.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i]} />
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Legend />
@@ -148,8 +225,8 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* ===== INVENTORY TABLE ===== */}
-        <section className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 hover:border-indigo-500/40 transition-all duration-300">
+        {/* TABLE – now using real data */}
+        <section className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 hover:border-indigo-500/40 transition-all">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <FileText className="text-indigo-400" />
             Current Inventory Details
@@ -157,9 +234,9 @@ export default function InventoryDashboard() {
 
           {/* Mobile Cards */}
           <div className="sm:hidden space-y-4">
-            {inventoryRows.map((row, i) => (
+            {inventory.map((row) => (
               <div
-                key={i}
+                key={row._id}
                 className="bg-gray-900/60 border border-gray-800 rounded-xl p-4"
               >
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -180,7 +257,7 @@ export default function InventoryDashboard() {
                     {row.size} mm
                   </div>
                   <div className="col-span-2 font-semibold text-indigo-300">
-                    {row.qty} MT
+                    {row.quantityMT.toLocaleString()} MT
                   </div>
                 </div>
               </div>
@@ -200,9 +277,9 @@ export default function InventoryDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {inventoryRows.map((row, i) => (
+                {inventory.map((row) => (
                   <tr
-                    key={i}
+                    key={row._id}
                     className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
                   >
                     <td className="py-3 px-2">{row.area}</td>
@@ -210,7 +287,7 @@ export default function InventoryDashboard() {
                     <td className="py-3 px-2 text-center">{row.type}</td>
                     <td className="py-3 px-2 text-center">{row.size}</td>
                     <td className="py-3 px-2 text-right font-semibold text-indigo-300">
-                      {row.qty}
+                      {row.quantityMT.toLocaleString()}
                     </td>
                   </tr>
                 ))}

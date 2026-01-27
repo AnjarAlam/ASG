@@ -30,7 +30,7 @@ export default function InwardDashboard() {
 
   /* ===================== FETCH DATA ===================== */
   useEffect(() => {
-    fetchInwards(1, 10);
+    fetchInwards(1, Number.MAX_SAFE_INTEGER);
   }, []);
 
   /* ===================== TODAY FILTER ===================== */

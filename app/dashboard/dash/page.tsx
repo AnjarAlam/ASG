@@ -29,133 +29,200 @@ import {
   Home,
   Grid,
 } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { useInventoryStore } from "@/store/inventory-store";
+import { useInwardStore } from "@/store/inward-store";
+import dayjs from "dayjs";
 
 /* ================= DATA ================= */
 
 // KPIs
-const kpis = [
-  { label: "Total Coal Stock", value: "15,458 MT", icon: Warehouse },
-  { label: "ROM Coal", value: "6,320 MT", icon: Layers },
-  { label: "Steam Coal", value: "4,180 MT", icon: Layers },
-  { label: "Boulders", value: "2,940 MT", icon: Layers },
-  { label: "Vehicles Inward Today", value: "39", icon: ArrowDownCircle },
-  { label: "Vehicles Outward Today", value: "26", icon: ArrowUpCircle },
-  {
-    label: "Coal Inward Today",
-    value: "1,428 MT",
-    icon: (props: any) => (
-      <Truck
-        {...props}
-        className="scale-x-[-1.25] text-indigo-400 scale-y-125"
-      />
-    ),
-  },
-  { label: "Coal Outward Today", value: "1,112 MT", icon: Truck },
-  { label: "Rejected Coal", value: "98 MT", icon: AlertTriangle },
-  { label: "Avg Weighment Time", value: "3.4 min", icon: Gauge },
-  { label: "Pending Vehicles", value: "7", icon: Clock },
-  { label: "Completed Trips", value: "124", icon: CheckCircle },
-];
-
-// Coal Grades (Pie)
-const gradeSplit = [
-  { name: "Grade E", value: 48 },
-  { name: "Grade F", value: 32 },
-  { name: "Grade B", value: 20 },
-];
-
-const GRADE_COLORS = ["#6366f1", "#a855f7", "#c084fc"];
-
-// Monthly Coal Inward (MT)
-const monthlyInward = [
-  { month: "Jan", value: 12500 },
-  { month: "Feb", value: 14800 },
-  { month: "Mar", value: 16200 },
-  { month: "Apr", value: 13900 },
-  { month: "May", value: 17800 },
-  { month: "Jun", value: 15500 },
-  { month: "Jul", value: 19200 },
-  { month: "Aug", value: 16800 },
-  { month: "Sep", value: 18400 },
-  { month: "Oct", value: 15900 },
-  { month: "Nov", value: 14200 },
-  { month: "Dec", value: 15100 },
-];
-
-// Daily Coal Movement (MT)
-const dailyFlow = [
-  { day: "Sun", value: 4200 },
-  { day: "Mon", value: 5800 },
-  { day: "Tue", value: 5300 },
-  { day: "Wed", value: 7100 },
-  { day: "Thu", value: 7600 },
-  { day: "Fri", value: 6200 },
-  { day: "Sat", value: 6800 },
-];
-
-// Space Utilization (by area)
-const spaceUtilization = [
-  { area: "A", occupied: 45, total: 100, color: "#4f46e5" },
-  { area: "B", occupied: 38, total: 100, color: "#7c3aed" },
-  { area: "C", occupied: 62, total: 100, color: "#a855f7" },
-  { area: "D", occupied: 71, total: 100, color: "#c084fc" },
-  { area: "E", occupied: 54, total: 100, color: "#6366f1" },
-  { area: "F", occupied: 88, total: 100, color: "#8b5cf6" },
-  { area: "G", occupied: 93, total: 100, color: "#a78bfa" },
-];
-
-// Recent Inwards & Outwards
-const recentInwards = [
-  {
-    vehicle: "GJ-01-AB-1234",
-    quantity: "45.2 MT",
-    grade: "E",
-    type: "ROM",
-    time: "12 min ago",
-  },
-  {
-    vehicle: "GJ-12-EF-9012",
-    quantity: "46.8 MT",
-    grade: "B",
-    type: "Boulders",
-    time: "25 min ago",
-  },
-  {
-    vehicle: "GJ-03-GH-3456",
-    quantity: "44.0 MT",
-    grade: "E",
-    type: "Rejected",
-    time: "35 min ago",
-  },
-];
-
-const recentOutwards = [
-  {
-    vehicle: "GJ-05-CD-5678",
-    quantity: "43.1 MT",
-    grade: "F",
-    type: "Steam",
-    time: "15 min ago",
-  },
-  {
-    vehicle: "GJ-12-EF-9012",
-    quantity: "46.8 MT",
-    grade: "B",
-    type: "Boulders",
-    time: "30 min ago",
-  },
-  {
-    vehicle: "GJ-03-GH-3456",
-    quantity: "44.0 MT",
-    grade: "E",
-    type: "Rejected",
-    time: "45 min ago",
-  },
-];
 
 /* ================= PAGE ================= */
 
+const COLORS = ["#6366f1", "#a855f7", "#c084fc", "#f472b6", "#fb923c"];
+
 export default function CoalDashboard() {
+  const {
+    inventory,
+    areaSummaries,
+    totalStockMT,
+    activeAreasCount,
+    rejectedCoalMT,
+    loading,
+    error,
+    fetchAllInventory,
+    fetchAreaWiseSummary,
+    // fetchGradeSizeSummary,
+  } = useInventoryStore();
+  const { inwards, fetchInwards } = useInwardStore();
+
+  // Load data on mount
+  useEffect(() => {
+    fetchAllInventory();
+    fetchAreaWiseSummary();
+    fetchInwards(1, Number.MAX_SAFE_INTEGER);
+    // fetchGradeSizeSummary(); // if needed
+  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards]);
+
+  const today = dayjs().format("YYYY-MM-DD");
+
+  const todayInwards = useMemo(
+    () =>
+      inwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+      ),
+    [inwards],
+  );
+  const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
+  const stats = useMemo(() => {
+    const totalNet = todayInwards.reduce((sum, i) => sum + i.netWeight, 0);
+
+    return {
+      totalVehiclesToday: todayInwards.length,
+      totalCoalInwardToday: `${totalNet.toFixed(2)} MT`,
+      averageNetWeight: todayInwards.length
+        ? `${(totalNet / todayInwards.length).toFixed(2)} MT`
+        : "0 MT",
+      rejectedCoalToday: "—",
+    };
+  }, [todayInwards]);
+
+  const kpis = [
+    {
+      label: "Total Coal Stock",
+      value: formatMT(totalStockMT),
+      icon: Warehouse,
+    },
+    { label: "ROM Coal", value: "6,320 MT", icon: Layers },
+    { label: "Steam Coal", value: "4,180 MT", icon: Layers },
+    { label: "Boulders", value: "2,940 MT", icon: Layers },
+    {
+      label: "Vehicles Inward Today",
+      value: stats.totalVehiclesToday,
+      icon: ArrowDownCircle,
+    },
+    { label: "Vehicles Outward Today", value: "26", icon: ArrowUpCircle },
+    {
+      label: "Coal Inward Today",
+      value: stats.totalCoalInwardToday,
+      icon: (props: any) => (
+        <Truck
+          {...props}
+          className="scale-x-[-1.25] text-indigo-400 scale-y-125"
+        />
+      ),
+    },
+    { label: "Coal Outward Today", value: "1,112 MT", icon: Truck },
+    // { label: "Rejected Coal", value: "98 MT", icon: AlertTriangle },
+    // { label: "Avg Weighment Time", value: "3.4 min", icon: Gauge },
+    // { label: "Pending Vehicles", value: "7", icon: Clock },
+    // { label: "Completed Trips", value: "124", icon: CheckCircle },
+  ];
+
+  // Coal Grades (Pie)
+  const gradeDistribution = [
+    { name: "Grade E", value: 0 },
+    { name: "Grade F", value: 0 },
+    { name: "Grade B", value: 0 },
+  ];
+
+  inventory.forEach((item) => {
+    if (item.grade === "E") gradeDistribution[0].value += item.quantityMT;
+    if (item.grade === "F") gradeDistribution[1].value += item.quantityMT;
+    if (item.grade === "B") gradeDistribution[2].value += item.quantityMT;
+  });
+
+  const GRADE_COLORS = ["#6366f1", "#a855f7", "#c084fc"];
+
+  // Monthly Coal Inward (MT)
+  const monthlyInward = [
+    { month: "Jan", value: 12500 },
+    { month: "Feb", value: 14800 },
+    { month: "Mar", value: 16200 },
+    { month: "Apr", value: 13900 },
+    { month: "May", value: 17800 },
+    { month: "Jun", value: 15500 },
+    { month: "Jul", value: 19200 },
+    { month: "Aug", value: 16800 },
+    { month: "Sep", value: 18400 },
+    { month: "Oct", value: 15900 },
+    { month: "Nov", value: 14200 },
+    { month: "Dec", value: 15100 },
+  ];
+
+  // Daily Coal Movement (MT)
+  const dailyFlow = [
+    { day: "Sun", value: 4200 },
+    { day: "Mon", value: 5800 },
+    { day: "Tue", value: 5300 },
+    { day: "Wed", value: 7100 },
+    { day: "Thu", value: 7600 },
+    { day: "Fri", value: 6200 },
+    { day: "Sat", value: 6800 },
+  ];
+
+  // Space Utilization (by area)
+  const spaceUtilization = [
+    { area: "A", occupied: 45, total: 100, color: "#4f46e5" },
+    { area: "B", occupied: 38, total: 100, color: "#7c3aed" },
+    { area: "C", occupied: 62, total: 100, color: "#a855f7" },
+    { area: "D", occupied: 71, total: 100, color: "#c084fc" },
+    { area: "E", occupied: 54, total: 100, color: "#6366f1" },
+    { area: "F", occupied: 88, total: 100, color: "#8b5cf6" },
+    { area: "G", occupied: 93, total: 100, color: "#a78bfa" },
+  ];
+
+  // Recent Inwards & Outwards
+  const recentInwards = [
+    {
+      vehicle: "GJ-01-AB-1234",
+      quantity: "45.2 MT",
+      grade: "E",
+      type: "ROM",
+      time: "12 min ago",
+    },
+    {
+      vehicle: "GJ-12-EF-9012",
+      quantity: "46.8 MT",
+      grade: "B",
+      type: "Boulders",
+      time: "25 min ago",
+    },
+    {
+      vehicle: "GJ-03-GH-3456",
+      quantity: "44.0 MT",
+      grade: "E",
+      type: "Rejected",
+      time: "35 min ago",
+    },
+  ];
+
+  const recentOutwards = [
+    {
+      vehicle: "GJ-05-CD-5678",
+      quantity: "43.1 MT",
+      grade: "F",
+      type: "Steam",
+      time: "15 min ago",
+    },
+    {
+      vehicle: "GJ-12-EF-9012",
+      quantity: "46.8 MT",
+      grade: "B",
+      type: "Boulders",
+      time: "30 min ago",
+    },
+    {
+      vehicle: "GJ-03-GH-3456",
+      quantity: "44.0 MT",
+      grade: "E",
+      type: "Rejected",
+      time: "45 min ago",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
       <main className="max-w-[1600px] mx-auto px-4 lg:px-6 py-8 space-y-8">
@@ -176,7 +243,7 @@ export default function CoalDashboard() {
 
         {/* ===== KPI GRID ===== */}
         <section>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {kpis.map((k) => (
               <div
                 key={k.label}
@@ -195,22 +262,23 @@ export default function CoalDashboard() {
         {/* ===== CHART SECTION 1 ===== */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coal Grades (Pie) */}
-          <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all duration-300">
+          <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all">
             <h3 className="font-semibold mb-2 flex items-center gap-2">
               <BarChart3 className="text-indigo-400" />
-              Coal Grades
+              Grade Distribution
             </h3>
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>
                 <Pie
-                  data={gradeSplit}
+                  data={gradeDistribution}
                   dataKey="value"
+                  nameKey="name"
                   innerRadius={55}
                   outerRadius={85}
                   label
                 >
-                  {gradeSplit.map((_, i) => (
-                    <Cell key={i} fill={GRADE_COLORS[i]} />
+                  {gradeDistribution.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Legend />
