@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpToLine,
@@ -9,6 +10,8 @@ import {
   Plus,
   Clock,
   TrendingUp,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -18,92 +21,160 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
   Legend,
 } from "recharts";
+
+// ── dayjs + plugins ────────────────────────────────────────────────
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
+
+// ── Zustand store ──────────────────────────────────────────────────
+import { useOutwardStore } from "@/store/outward-store"; // ← adjust path if needed
+
+// Helper: format weight as MT (your style - whole or .00)
+const formatWeight = (kg: number = 0) => {
+  return `${(kg / 1000).toFixed(2)} MT`;
+};
 
 export default function OutwardDashboard() {
   const router = useRouter();
 
-  const stats = {
-    totalVehiclesToday: 28,
-    totalCoalOutwardToday: "1,310 MT",
-    averageNetWeight: "46.8 MT",
-    rejectedCoalToday: "12 MT",
-  };
+  const {
+    outwards,
+    localOutwards,
+    loading,
+    error,
+    fetchOutwards,
+    fetchLocalOutwards,
+  } = useOutwardStore();
 
-  const recentOutwards = [
-    { vehicle: "GJ-02-AB-2345", customer: "ABC Power", netWeight: "42.5 MT", grade: "E", type: "ROM", size: "20-50", area: "A", time: "10 min ago" },
-    { vehicle: "GJ-06-CD-6789", customer: "XYZ Industries", netWeight: "44.2 MT", grade: "F", type: "Steam", size: "10-20", area: "B", time: "20 min ago" },
-    { vehicle: "GJ-13-EF-9013", customer: "Coal Corp", netWeight: "48.0 MT", grade: "B", type: "Boulders", size: "50-80", area: "C", time: "35 min ago" },
-    { vehicle: "GJ-04-GH-4567", customer: "National Coal Ltd", netWeight: "43.5 MT", grade: "E", type: "Rejected", size: "0-10", area: "D", time: "1 hr ago" },
-  ];
+  // Fetch data
+  useEffect(() => {
+    fetchOutwards(1, 30);       // more items → better recent + trend
+    fetchLocalOutwards();
+  }, [fetchOutwards, fetchLocalOutwards]);
 
-  // New: Sample outward tokens (you can replace with real data later)
-  const recentOutwardTokens = [
-    {
-      tokenNumber: "TO 2026-01-22 18:45 01",
-      vehicle: "GJ-02-AB-2345",
-      customer: "ABC Power",
-      netWeight: "42.5 MT",
-      grade: "E",
-      type: "ROM",
-      size: "20-50",
-      area: "A",
-      time: "10 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 18:32 02",
-      vehicle: "GJ-06-CD-6789",
-      customer: "XYZ Industries",
-      netWeight: "44.2 MT",
-      grade: "F",
-      type: "Steam",
-      size: "10-20",
-      area: "B",
-      time: "20 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 18:15 03",
-      vehicle: "GJ-13-EF-9013",
-      customer: "Coal Corp",
-      netWeight: "48.0 MT",
-      grade: "B",
-      type: "Boulders",
-      size: "50-80",
-      area: "C",
-      time: "35 min ago",
-    },
-    {
-      tokenNumber: "TO 2026-01-22 17:40 04",
-      vehicle: "GJ-04-GH-4567",
-      customer: "National Coal Ltd",
-      netWeight: "43.5 MT",
-      grade: "E",
-      type: "Rejected",
-      size: "0-10",
-      area: "D",
-      time: "1 hr ago",
-    },
-  ];
+  // Combine & sort newest first
+  const allOutwards = useMemo(() => {
+    return [...outwards, ...localOutwards]
+      .filter((o) => !o.isDeleted)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [outwards, localOutwards]);
 
-  const outwardTrend = [
-    { date: "Jan 03", A: 420, B: 380, C: 310, D: 130, E: 180, F: 90, G: 50 },
-    { date: "Jan 04", A: 510, B: 450, C: 380, D: 220, E: 210, F: 110, G: 70 },
-    { date: "Jan 05", A: 460, B: 390, C: 340, D: 150, E: 190, F: 100, G: 60 },
-    { date: "Jan 06", A: 580, B: 520, C: 410, D: 180, E: 240, F: 130, G: 80 },
-    { date: "Jan 07", A: 490, B: 430, C: 360, D: 200, E: 220, F: 120, G: 65 },
-    { date: "Jan 08", A: 540, B: 480, C: 390, D: 200, E: 230, F: 125, G: 75 },
-    { date: "Jan 09", A: 470, B: 410, C: 350, D: 198, E: 205, F: 115, G: 68 },
-  ];
+  // Today filter (using createdAt fallback)
+  const today = dayjs().format("YYYY-MM-DD");
 
-  const gradeDistribution = [
-    { grade: "E", value: 48 },
-    { grade: "F", value: 32 },
-    { grade: "B", value: 20 },
-  ];
+  const todayOutwards = useMemo(
+    () =>
+      allOutwards.filter(
+        (o) => dayjs(o.dispatchDateTime || o.createdAt).format("YYYY-MM-DD") === today
+      ),
+    [allOutwards]
+  );
+
+  // Stats (your original logic)
+  const stats = useMemo(() => {
+    const totalNet = todayOutwards.reduce((sum, o) => sum + (o.netWeight || 0), 0);
+
+    return {
+      totalVehiclesToday: todayOutwards.length,
+      totalCoalOutwardToday: formatWeight(totalNet),
+      averageNetWeight: todayOutwards.length
+        ? formatWeight(totalNet / todayOutwards.length)
+        : "0.00 MT",
+      rejectedCoalToday: "—", // ← can be improved later if you add rejected logic
+    };
+  }, [todayOutwards]);
+
+  // Recent entries (last 4 like your code)
+  const recentOutwards = useMemo(() => {
+    return allOutwards
+      .slice(0, 4)
+      .map((entry) => ({
+        vehicle: entry.vehicleNumber || "—",
+        customer: entry.customerName || "—",
+        netWeight: formatWeight(entry.netWeight),
+        grade: entry.coalGrade || "—",
+        type: entry.coalType || "—",
+        size: entry.coalSize || "—",
+        area: entry.area || "—",
+        time: dayjs(entry.dispatchDateTime || entry.createdAt).fromNow(),
+      }));
+  }, [allOutwards]);
+
+  // Recent tokens (last 4 + fallback token number)
+  const recentOutwardTokens = useMemo(() => {
+    return allOutwards
+      .slice(0, 4)
+      .map((entry) => ({
+        tokenNumber: entry.tokenNumber || `TO-${entry._id?.slice(-8) || "XXXX"}`,
+        vehicle: entry.vehicleNumber || "—",
+        customer: entry.customerName || "—",
+        netWeight: formatWeight(entry.netWeight),
+        grade: entry.coalGrade || "—",
+        type: entry.coalType || "—",
+        size: entry.coalSize || "—",
+        area: entry.area || "—",
+        time: dayjs(entry.dispatchDateTime || entry.createdAt).fromNow(),
+      }));
+  }, [allOutwards]);
+
+  // Grade distribution today
+  const gradeDistribution = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    todayOutwards.forEach((o) => {
+      const grade = o.coalGrade || "Unknown";
+      map[grade] = (map[grade] || 0) + (o.netWeight || 0) / 1000;
+    });
+
+    return Object.entries(map)
+      .map(([grade, value]) => ({
+        grade,
+        value: Number(value.toFixed(2)),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [todayOutwards]);
+
+  // Outward trend last 7 days – area wise
+  const outwardTrend = useMemo(() => {
+    const areas = ["A", "B", "C", "D", "E", "F", "G"];
+
+    return Array.from({ length: 7 })
+      .map((_, i) => {
+        const day = dayjs().subtract(6 - i, "day");
+        const dayStr = day.format("YYYY-MM-DD");
+        const dayLabel = day.format("MMM DD");
+
+        const dayData = allOutwards.filter(
+          (o) => dayjs(o.dispatchDateTime || o.createdAt).format("YYYY-MM-DD") === dayStr
+        );
+
+        const row: Record<string, any> = { date: dayLabel };
+
+        areas.forEach((area) => {
+          row[area] = dayData
+            .filter((o) => o.area === area)
+            .reduce((sum, o) => sum + (o.netWeight || 0) / 1000, 0);
+        });
+
+        return row;
+      });
+  }, [allOutwards]);
+
+  // ── Loading overlay ───────────────────────────────────────────────
+  if (loading && allOutwards.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading outward data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-gray-100 pb-8">
@@ -115,8 +186,12 @@ export default function OutwardDashboard() {
               <ArrowUpToLine className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Outward Dashboard</h1>
-              <p className="text-sm text-gray-400 mt-0.5">Monitor outgoing coal shipments</p>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Outward Dashboard
+              </h1>
+              <p className="text-sm text-gray-400 mt-0.5">
+                Monitor outgoing coal shipments
+              </p>
             </div>
           </div>
 
@@ -130,14 +205,24 @@ export default function OutwardDashboard() {
         </div>
       </div>
 
+      {/* Error message */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-red-950/60 border border-red-800 rounded-xl p-4 flex items-center gap-3 text-red-300">
+            <AlertCircle className="w-5 h-5" />
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 sm:space-y-10">
-        {/* ================= KPI CARDS ================= */}
+        {/* KPI CARDS */}
         <section>
           <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-200">
             Today's Outward Summary
           </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {[
               { label: "Vehicles Today", value: stats.totalVehiclesToday, color: "text-indigo-400" },
               { label: "Coal Outward", value: stats.totalCoalOutwardToday, color: "text-green-400" },
@@ -160,207 +245,161 @@ export default function OutwardDashboard() {
           </div>
         </section>
 
-        {/* ================= CHARTS ================= */}
+        {/* Recent lists */}
         <section className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8">
-          {/* Recent Outwards */}
+          {/* Recent Outward Entries */}
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
             <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
               <Truck className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
               Recent Outward Entries
             </h3>
 
-            <div className="space-y-4">
-              {recentOutwards.map((entry, i) => (
-                <div
-                  key={i}
-                  className="p-4 bg-gray-900/50 rounded-xl border-l-4 border-indigo-500/40 hover:bg-gray-800/60 transition-colors"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-white text-sm sm:text-base">
-                        {entry.vehicle} • {entry.customer}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                        {entry.netWeight} • Grade {entry.grade} • {entry.type} • {entry.size}mm → Area {entry.area}
-                      </p>
-                    </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
-                      <Clock className="w-4 h-4" />
-                      {entry.time}
+            <div className="space-y-4 min-h-[260px]">
+              {recentOutwards.length === 0 ? (
+                <p className="text-center text-gray-500 py-10">No recent outward entries</p>
+              ) : (
+                recentOutwards.map((entry, i) => (
+                  <div
+                    key={i}
+                    className="p-4 bg-gray-900/50 rounded-xl border-l-4 border-indigo-500/40 hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-white text-sm sm:text-base">
+                          {entry.vehicle} • {entry.customer}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                          {entry.netWeight} • Grade {entry.grade} • {entry.type} •{" "}
+                          {entry.size}mm → Area {entry.area}
+                        </p>
+                      </div>
+                      <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
+                        <Clock className="w-4 h-4" />
+                        {entry.time}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
-          <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
-            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
-            Recent Outward Tokens
-          </h3>
-
-          <div className="space-y-4">
-            {recentOutwardTokens.map((token, i) => (
-              <div
-                key={i}
-                className="p-4 bg-gray-900/50 rounded-xl border-l-4 border-indigo-500/40 hover:bg-gray-800/60 transition-colors"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-white text-sm sm:text-base">
-                      {token.tokenNumber} • {token.vehicle}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                      {token.customer} • {token.netWeight} • Grade {token.grade} • {token.type} •{" "}
-                      {token.size}mm → Area {token.area}
-                    </p>
-                  </div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
-                    <Clock className="w-4 h-4" />
-                    {token.time}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-        </section>
-          {/* Grade Distribution - Line Chart (you had LineChart here instead of PieChart) */}
+          {/* Recent Outward Tokens */}
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
-            <h3 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2.5">
-              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
-              Grade-wise Outward Today (MT)
+            <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
+              Recent Outward Tokens
             </h3>
 
-            <div className="h-64 sm:h-72 pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={gradeDistribution}
-                  margin={{ top: 15, right: 15, left: -25, bottom: 5 }}
-                >
-                  <defs>
-                    <linearGradient id="gradeGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity={0.55} />
-                      <stop offset="50%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid
-                    strokeDasharray="3 5"
-                    stroke="#1f2937"
-                    vertical={false}
-                    opacity={0.6}
-                  />
-
-                  <XAxis
-                    dataKey="grade"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#9ca3af", fontSize: 13, fontWeight: 500 }}
-                    dy={8}
-                  />
-
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    domain={[0, "dataMax + 15"]}
-                  />
-
-                  <Tooltip
-                    cursor={{
-                      stroke: "#6366f1",
-                      strokeWidth: 1.5,
-                      strokeDasharray: "5 5",
-                    }}
-                    contentStyle={{
-                      backgroundColor: "rgba(31, 41, 55, 0.92)",
-                      border: "1px solid #6366f122",
-                      borderRadius: "10px",
-                      padding: "10px 14px",
-                      fontSize: "13px",
-                      boxShadow: "0 12px 30px -8px rgba(99, 102, 241, 0.35)",
-                    }}
-                    labelStyle={{ color: "#6366f1", fontWeight: 600 }}
-                    formatter={(value: number) => [`${value} MT`, "Value"]}
-                  />
-
-                  <Line
-                    type="monotoneX"
-                    dataKey="value"
-                    stroke="#6366f1"
-                    strokeWidth={3.5}
-                    strokeLinecap="round"
-                    dot={{
-                      r: 5,
-                      stroke: "#6366f1",
-                      strokeWidth: 2.5,
-                      fill: "#111827",
-                      opacity: 0.9,
-                    }}
-                    activeDot={{
-                      r: 9,
-                      stroke: "#6366f1",
-                      strokeWidth: 4,
-                      fill: "#fff",
-                    }}
-                    fill="url(#gradeGlow)"
-                    fillOpacity={1}
-                    animationDuration={1800}
-                    animationEasing="ease-in-out"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="space-y-4 min-h-[260px]">
+              {recentOutwardTokens.length === 0 ? (
+                <p className="text-center text-gray-500 py-10">No recent tokens</p>
+              ) : (
+                recentOutwardTokens.map((token, i) => (
+                  <div
+                    key={i}
+                    className="p-4 bg-gray-900/50 rounded-xl border-l-4 border-indigo-500/40 hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-white text-sm sm:text-base">
+                          {token.tokenNumber} • {token.vehicle}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                          {token.customer} • {token.netWeight} • Grade {token.grade} •{" "}
+                          {token.type} • {token.size}mm → Area {token.area}
+                        </p>
+                      </div>
+                      <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
+                        <Clock className="w-4 h-4" />
+                        {token.time}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
-
-        {/* ================= NEW: RECENT OUTWARD TOKENS ================= */}
-        <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
-          <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
-            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
-            Recent Outward Tokens
-          </h3>
-
-          <div className="space-y-4">
-            {recentOutwardTokens.map((token, i) => (
-              <div
-                key={i}
-                className="p-4 bg-gray-900/50 rounded-xl border-l-4 border-indigo-500/40 hover:bg-gray-800/60 transition-colors"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-white text-sm sm:text-base">
-                      {token.tokenNumber} • {token.vehicle}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                      {token.customer} • {token.netWeight} • Grade {token.grade} • {token.type} •{" "}
-                      {token.size}mm → Area {token.area}
-                    </p>
-                  </div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1.5 whitespace-nowrap">
-                    <Clock className="w-4 h-4" />
-                    {token.time}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
-        {/* ================= OUTWARD TREND ================= */}
+        {/* Grade Distribution */}
+        <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
+          <h3 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2.5">
+            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
+            Grade-wise Outward Today (MT)
+          </h3>
+
+          <div className="h-64 sm:h-72 pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={gradeDistribution}
+                margin={{ top: 15, right: 15, left: -25, bottom: 5 }}
+              >
+                <defs>
+                  <linearGradient id="gradeGlow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.55} />
+                    <stop offset="50%" stopColor="#6366f1" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid strokeDasharray="3 5" stroke="#1f2937" vertical={false} opacity={0.6} />
+
+                <XAxis
+                  dataKey="grade"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#9ca3af", fontSize: 13, fontWeight: 500 }}
+                  dy={8}
+                />
+
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#9ca3af", fontSize: 12 }}
+                  domain={[0, "dataMax + 10"]}
+                />
+
+                <Tooltip
+                  cursor={{ stroke: "#6366f1", strokeWidth: 1.5, strokeDasharray: "5 5" }}
+                  contentStyle={{
+                    backgroundColor: "rgba(31, 41, 55, 0.92)",
+                    border: "1px solid #6366f122",
+                    borderRadius: "10px",
+                    padding: "10px 14px",
+                    fontSize: "13px",
+                  }}
+                  formatter={(value: number) => [`${value} MT`, "Value"]}
+                />
+
+                <Line
+                  type="monotoneX"
+                  dataKey="value"
+                  stroke="#6366f1"
+                  strokeWidth={3.5}
+                  strokeLinecap="round"
+                  dot={{ r: 5, stroke: "#6366f1", strokeWidth: 2.5, fill: "#111827", opacity: 0.9 }}
+                  activeDot={{ r: 9, stroke: "#6366f1", strokeWidth: 4, fill: "#fff" }}
+                  fill="url(#gradeGlow)"
+                  fillOpacity={1}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* Outward Trend */}
         <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
           <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
             <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
             Outward Trend (Last 7 Days)
           </h3>
 
-          <div className="h-64 sm:h-80 lg:h-96">
+          <div className="h-80 sm:h-96">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={outwardTrend}
-                margin={{ top: 10, right: 30, left: 0, bottom: 10 }}
+                margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
               >
                 <defs>
                   <linearGradient id="fillA" x1="0" y1="0" x2="0" y2="1">
@@ -393,11 +432,7 @@ export default function OutwardDashboard() {
                   </linearGradient>
                 </defs>
 
-                <CartesianGrid
-                  strokeDasharray="4 4"
-                  stroke="#1f2937"
-                  vertical={false}
-                />
+                <CartesianGrid strokeDasharray="4 4" stroke="#1f2937" vertical={false} />
 
                 <XAxis
                   dataKey="date"
@@ -407,44 +442,95 @@ export default function OutwardDashboard() {
                 />
 
                 <YAxis
-                  yAxisId="left"
                   tick={{ fill: "#9ca3af", fontSize: 12 }}
                   axisLine={false}
                   tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#9ca3af", fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => `${value}`}
                 />
 
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "rgba(31, 41, 55, 0.94)",
+                    backgroundColor: "rgba(31,41,55,0.94)",
                     border: "none",
                     borderRadius: "10px",
                     boxShadow: "0 10px 25px -5px rgba(99,102,241,0.25)",
-                    fontSize: "13px",
-                    padding: "10px 14px",
                   }}
-                  labelStyle={{ color: "#e5e7eb", fontWeight: 600 }}
                 />
 
                 <Legend
                   wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
                   iconType="circle"
-                  layout="horizontal"
-                  verticalAlign="bottom"
                 />
 
-                <Line type="monotone" dataKey="A" name="Area A" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillA)" />
-                <Line type="monotone" dataKey="B" name="Area B" stroke="#818cf8" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillB)" />
-                <Line type="monotone" dataKey="C" name="Area C" stroke="#a78bfa" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillC)" />
-                <Line type="monotone" dataKey="D" name="Area D" stroke="#c084fc" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillD)" />
-                <Line type="monotone" dataKey="E" name="Area E" stroke="#d8b4fe" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillE)" />
-                <Line type="monotone" dataKey="F" name="Area F" stroke="#f0abfc" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillF)" />
-                <Line type="monotone" dataKey="G" name="Area G" stroke="#fbb6ce" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillG)" />
+                <Line
+                  type="monotone"
+                  dataKey="A"
+                  name="Area A"
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillA)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="B"
+                  name="Area B"
+                  stroke="#818cf8"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillB)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="C"
+                  name="Area C"
+                  stroke="#a78bfa"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillC)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="D"
+                  name="Area D"
+                  stroke="#c084fc"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillD)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="E"
+                  name="Area E"
+                  stroke="#d8b4fe"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillE)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="F"
+                  name="Area F"
+                  stroke="#f0abfc"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillF)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="G"
+                  name="Area G"
+                  stroke="#fbb6ce"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillG)"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -452,4 +538,4 @@ export default function OutwardDashboard() {
       </main>
     </div>
   );
-} 
+}

@@ -10,8 +10,13 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
+<<<<<<< HEAD
     "dayjs": "^1.11.19",
     "date-fns": "^4.1.0",
+=======
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.19",
+>>>>>>> 5dd71a86a772a67ec69b8fd79659923aeedde447
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "react": "19.2.3",
@@ -21,8 +26,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
+    "@types/node": "20.19.30",
+    "@types/react": "19.2.9",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",

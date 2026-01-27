@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
@@ -24,6 +24,8 @@ type Role = "OPERATOR" | "USER" | "ADMIN" | "SUPER_ADMIN";
 export default function CreateUserPage() {
   const router = useRouter();
   const { user, accessToken, isAuthenticated } = useAuthStore();
+
+  const firstInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -51,12 +53,30 @@ export default function CreateUserPage() {
     }
   }, [isAuthenticated, user?.role, router]);
 
+  // Auto focus first field
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, []);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError(""); // clear error on input change
+    setError(""); // Clear error when user types
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) return "Full name is required";
+    if (!formData.email.includes("@") || !formData.email.trim())
+      return "Valid email is required";
+    if (!/^\d{10}$/.test(formData.mobileNumber))
+      return "Mobile number must be exactly 10 digits";
+    if (formData.password.length < 6)
+      return "Password must be at least 6 characters";
+    if (formData.password !== formData.confirmPassword)
+      return "Passwords do not match";
+    return "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,47 +84,36 @@ export default function CreateUserPage() {
     setError("");
     setSuccess("");
 
-    // ─── Client-side validation ────────────────────────────────────────
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      return;
-    }
-    if (!/^\d{10}$/.test(formData.mobileNumber)) {
-      setError("Mobile number must be exactly 10 digits");
-      return;
-    }
-    if (!formData.name.trim()) {
-      setError("Full name is required");
-      return;
-    }
-    if (!formData.email.trim() || !formData.email.includes("@")) {
-      setError("Valid email is required");
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setLoading(true);
 
     try {
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        mobileNumber: formData.mobileNumber.trim(),
+        password: formData.password,
+        role: formData.role,
+        status: true,
+      };
+
+      // Optional: debug what is being sent
+      // console.log("Creating user with payload:", payload);
+
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user-auth/create`, // ← CHANGED HERE
+        `${process.env.NEXT_PUBLIC_API_URL}/user-auth/signup`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({
-            name: formData.name.trim(),
-            email: formData.email.trim().toLowerCase(),
-            mobileNumber: formData.mobileNumber.trim(),
-            password: formData.password,
-            role: formData.role,                     // ← this value is now sent and should be respected
-            status: true,
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -118,7 +127,7 @@ export default function CreateUserPage() {
         `User "${formData.name.trim()}" (${formData.role}) created successfully!`
       );
 
-      // Reset form after success
+      // Reset form
       setFormData({
         name: "",
         email: "",
@@ -130,12 +139,13 @@ export default function CreateUserPage() {
       setShowPassword(false);
       setShowConfirmPassword(false);
     } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err.message || "Failed to create user. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  // Not authorized / not logged in
   if (!isAuthenticated || !["ADMIN", "SUPER_ADMIN"].includes(user?.role || "")) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 to-black p-4">
@@ -157,9 +167,9 @@ export default function CreateUserPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
-      <div className="max-w-[1600px] mx-auto px-4 lg:px-8 py-10 space-y-10">
-        {/* HEADER */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white pb-12">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+        {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 shadow-lg shadow-indigo-900/40">
@@ -174,34 +184,35 @@ export default function CreateUserPage() {
               </p>
             </div>
           </div>
+
           <Link
             href="/dashboard/users"
-            className="flex items-center gap-2 px-6 py-3 bg-gray-800/70 border border-gray-700 hover:bg-gray-700/70 rounded-xl text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-6 py-3 bg-gray-800/70 border border-gray-700 hover:bg-gray-700 rounded-xl text-sm font-medium transition-colors"
           >
             <ArrowLeft size={18} />
-            Back to Users
+            Back to Users List
           </Link>
         </header>
 
-        {/* MESSAGES */}
+        {/* Messages */}
         {success && (
-          <div className="flex items-start gap-4 p-5 bg-emerald-950/50 border border-emerald-800/60 rounded-2xl">
-            <CheckCircle2 className="text-emerald-400 mt-0.5" size={24} />
+          <div className="flex items-start gap-4 p-5 bg-emerald-950/60 border border-emerald-800/50 rounded-2xl backdrop-blur-sm">
+            <CheckCircle2 className="text-emerald-400 mt-1" size={24} />
             <p className="text-emerald-100/95 flex-1">{success}</p>
           </div>
         )}
 
         {error && (
-          <div className="flex items-start gap-4 p-5 bg-rose-950/50 border border-rose-800/60 rounded-2xl">
-            <AlertCircle className="text-rose-400 mt-0.5" size={24} />
+          <div className="flex items-start gap-4 p-5 bg-rose-950/60 border border-rose-800/50 rounded-2xl backdrop-blur-sm">
+            <AlertCircle className="text-rose-400 mt-1" size={24} />
             <p className="text-rose-100/95 flex-1">{error}</p>
           </div>
         )}
 
-        {/* FORM */}
-        <section className="bg-gray-900/50 backdrop-blur-xl border border-gray-800/80 rounded-2xl shadow-2xl p-6 lg:p-10">
+        {/* Form Card */}
+        <section className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 rounded-2xl shadow-2xl p-6 lg:p-10">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-            {/* Name */}
+            {/* Full Name */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-300">
                 Full Name <span className="text-rose-500">*</span>
@@ -209,6 +220,7 @@ export default function CreateUserPage() {
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
                 <input
+                  ref={firstInputRef}
                   type="text"
                   name="name"
                   value={formData.name}
@@ -239,7 +251,7 @@ export default function CreateUserPage() {
               </div>
             </div>
 
-            {/* Mobile */}
+            {/* Mobile Number */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-300">
                 Mobile Number <span className="text-rose-500">*</span>
@@ -252,13 +264,15 @@ export default function CreateUserPage() {
                   value={formData.mobileNumber}
                   onChange={handleChange}
                   required
+                  pattern="\d{10}"
+                  maxLength={10}
                   placeholder="9876543210"
                   className="w-full pl-11 pr-4 py-3.5 bg-gray-800/60 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                 />
               </div>
             </div>
 
-            {/* Role */}
+            {/* Role Select */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-300">
                 Role <span className="text-rose-500">*</span>
@@ -270,7 +284,7 @@ export default function CreateUserPage() {
                   value={formData.role}
                   onChange={handleChange}
                   required
-                  className="w-full pl-11 pr-4 py-3.5 bg-gray-800/60 border border-gray-700 rounded-xl text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none"
+                  className="w-full pl-11 pr-4 py-3.5 bg-gray-800/60 border border-gray-700 rounded-xl text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none [&>option]:bg-gray-900 [&>option]:text-white"
                 >
                   <option value="OPERATOR">Operator</option>
                   <option value="USER">User</option>
@@ -333,7 +347,7 @@ export default function CreateUserPage() {
             </div>
 
             {/* Submit Button */}
-            <div className="lg:col-span-2 pt-4">
+            <div className="lg:col-span-2 pt-6">
               <button
                 type="submit"
                 disabled={loading}

@@ -208,7 +208,7 @@ export default function SettingsPage() {
 
         {/* Extra section - e.g. account status, theme preferences, etc. */}
         <div className="text-center text-sm text-gray-500 mt-12">
-          <p>Account created • Member since {new Date().getFullYear()}</p>
+          <p>Created  {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

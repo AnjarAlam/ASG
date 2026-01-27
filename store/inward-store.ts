@@ -6,7 +6,7 @@ import axios from "@/lib/axios";
 export enum VehicleSize {
   SMALL = "SMALL",
   LARGE = "LARGE",
-}
+} 
 
 export type InwardType = "GLOBAL" | "LOCAL";
 
