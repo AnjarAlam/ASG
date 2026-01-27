@@ -1,36 +1,39 @@
-"use client";
+"use client"
 
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { create } from "zustand"
+import { persist } from "zustand/middleware"
 
-export type UserRole = "ADMIN" | "OPERATOR" | "SUPER_ADMIN" | string; // extend as needed
+export type UserRole = "ADMIN" | "OPERATOR" | "USER" | "SUPER_ADMIN" | string
 
 export interface AuthUser {
-  id: string;           // comes as organization.id
-  name: string;
-  email: string;
-  role: UserRole;
-  // permissions?: string[];   ← not returned in login → load separately if needed
+  id: string
+  name: string
+  email: string
+  role: UserRole
 }
 
 interface AuthState {
-  user: AuthUser | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
+  user: AuthUser | null
+  accessToken: string | null
+  refreshToken: string | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  error: string | null
 
-  // Core actions
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  initializeAuth: () => void;
-
-  // Optional future methods
-  refreshSession?: () => Promise<boolean>;
+  // ─── Core actions ────────────────────────────────────────────────
+  initializeAuth: () => void
+  login: (email: string, password: string) => Promise<boolean>
+  signup: (data: {
+    name: string
+    email: string
+    mobileNumber: string
+    password: string
+    role?: UserRole           // optional — backend may restrict/ignore it
+  }) => Promise<{ success: boolean; message?: string }>
+  logout: () => void
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -39,70 +42,72 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true,           // ← Changed: start as true to prevent early redirect
       error: null,
 
+      // ─── Initialize from localStorage ──────────────────────────────
       initializeAuth: () => {
         try {
-          const storedAccess = localStorage.getItem("access_token");
-          const storedRefresh = localStorage.getItem("refresh_token");
-          const storedUser = localStorage.getItem("auth_user");
+          const storedAccess = localStorage.getItem("access_token")
+          const storedUser = localStorage.getItem("auth_user")
 
           if (storedAccess && storedUser) {
-            set({
-              accessToken: storedAccess,
-              refreshToken: storedRefresh || null,
-              user: JSON.parse(storedUser),
-              isAuthenticated: true,
-            });
+            const user = JSON.parse(storedUser)
+            if (user?.id && user?.email) {
+              set({
+                user,
+                accessToken: storedAccess,
+                isAuthenticated: true,
+                isLoading: false,
+                error: null
+              })
+              return
+            }
           }
         } catch (err) {
-          console.error("Auth init failed:", err);
-          set({ isAuthenticated: false });
+          console.error("Auth init failed:", err)
         }
+
+        set({ 
+          isAuthenticated: false, 
+          isLoading: false,      // ← Always set to false when finished
+          error: null 
+        })
       },
 
+      // ─── Login ─────────────────────────────────────────────────────
       login: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null })
 
         try {
-          const response = await fetch(`${API_BASE}/user-auth/login`, {
-            // ← adjust endpoint if different (e.g. /auth/login, /auth/signin)
+          const res = await fetch(`${API_BASE}/user-auth/login`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ email, password }),
-          });
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+          })
 
-          const data = await response.json();
+          const data = await res.json()
 
-          if (!response.ok) {
-            throw new Error(
-              data.message || "Invalid email or password"
-            );
+          if (!res.ok) {
+            throw new Error(data.message || "Invalid credentials")
           }
 
-          // Expected structure from your service
-          const { organization, accessToken, refreshToken } = data;
+          const { organization, accessToken, refreshToken } = data
 
           if (!accessToken || !organization) {
-            throw new Error("Invalid response from server");
+            throw new Error("Invalid server response")
           }
 
           const user: AuthUser = {
             id: organization.id,
             name: organization.name,
             email: organization.email,
-            role: organization.role,
-          };
-
-          // Save tokens & user
-          localStorage.setItem("access_token", accessToken);
-          if (refreshToken) {
-            localStorage.setItem("refresh_token", refreshToken);
+            role: organization.role
           }
-          localStorage.setItem("auth_user", JSON.stringify(user));
+
+          localStorage.setItem("access_token", accessToken)
+          if (refreshToken) localStorage.setItem("refresh_token", refreshToken)
+          localStorage.setItem("auth_user", JSON.stringify(user))
 
           set({
             user,
@@ -110,44 +115,92 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: refreshToken || null,
             isAuthenticated: true,
             isLoading: false,
-            error: null,
-          });
+            error: null
+          })
 
-          return true;
+          return true
         } catch (err: any) {
-          const msg =
-            err.message?.includes("Invalid")
-              ? "Invalid email or password"
-              : err.message || "Login failed. Please try again.";
-          set({ error: msg, isLoading: false });
-          return false;
+          const msg = err.message?.includes("Invalid")
+            ? "Invalid email or password"
+            : err.message || "Login failed"
+          set({ error: msg, isLoading: false })
+          return false
         }
       },
 
+      // ─── Signup / Create New User ────────────────────────────────
+      signup: async ({ name, email, mobileNumber, password, role = "OPERATOR" }) => {
+        set({ isLoading: true, error: null })
+
+        try {
+          const payload = {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            mobileNumber: mobileNumber.trim(),
+            password,
+            role,                
+            status: true
+          }
+
+          const res = await fetch(`${API_BASE}/user-auth/signup`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload)
+          })
+
+          const data = await res.json()
+
+          if (!res.ok) {
+            throw new Error(
+              data.message ||
+              data.error ||
+              "Failed to create user. Please check your input."
+            )
+          }
+
+          set({
+            isLoading: false,
+            error: null
+          })
+
+          return {
+            success: true,
+            message: "User created successfully! You can now log in."
+          }
+        } catch (err: any) {
+          const msg = err.message || "Failed to create account. Please try again."
+          set({ error: msg, isLoading: false })
+          return { success: false, message: msg }
+        }
+      },
+
+      // ─── Logout ─────────────────────────────────────────────────────
       logout: () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("auth_user");
+        localStorage.removeItem("access_token")
+        localStorage.removeItem("refresh_token")
+        localStorage.removeItem("auth_user")
 
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
-          error: null,
-        });
-      },
-
+          isLoading: false,
+          error: null
+        })
+      }
     }),
 
     {
-      name: "auth-storage", 
+      name: "auth-storage",
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
+        isAuthenticated: state.isAuthenticated
+      })
     }
   )
-);
+)

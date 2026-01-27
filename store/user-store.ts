@@ -2,7 +2,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { User } from "@/types/user"
-import { mockUsers } from "@/data/mockData"
 
 interface UserState {
   users: User[]
@@ -22,9 +21,6 @@ export const useUserStore = create<UserState>()(
 
       initializeUsers: () => {
         const state = get()
-        if (state.users.length === 0) {
-          set({ users: mockUsers })
-        }
       },
 
       addUser: (userData) => {
