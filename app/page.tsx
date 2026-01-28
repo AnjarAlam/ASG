@@ -18,7 +18,7 @@ export default function HomePage() {
     if (isLoading) return
 
     if (isAuthenticated) {
-      router.replace("/dashboard")
+      router.replace("../dashboard/dash")
     } else {
       router.replace("/login")
     }

@@ -84,7 +84,7 @@ export default function OutwardDashboard() {
       averageNetWeight: todayOutwards.length
         ? formatWeight(totalNet / todayOutwards.length)
         : "0.00 MT",
-      rejectedCoalToday: "—", // ← can be improved later if you add rejected logic
+      rejectedCoalToday: "—", 
     };
   }, [todayOutwards]);
 
