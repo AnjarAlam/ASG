@@ -45,6 +45,7 @@ export default function InventoryDashboard() {
     loading,
     error,
     fetchAllInventory,
+    fetchInventory,
     fetchAreaWiseSummary,
     // fetchGradeSizeSummary,
   } = useInventoryStore();
@@ -53,13 +54,14 @@ export default function InventoryDashboard() {
 
   // Load data on mount
   useEffect(() => {
-    fetchAllInventory();
+    fetchAllInventory(1, Number.MAX_SAFE_INTEGER);
+    fetchInventory();
     fetchAreaWiseSummary();
     fetchInwards(1, Number.MAX_SAFE_INTEGER);
     fetchOutwards(1, Number.MAX_SAFE_INTEGER);
     // fetchGradeSizeSummary(); // if needed
-  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards, fetchOutwards]);
-  console.log("inventory", inventory);
+  }, [fetchAllInventory, fetchInventory, fetchAreaWiseSummary, fetchInwards, fetchOutwards]);
+  // console.log("inventory", inventory);
 
   const today = dayjs().format("YYYY-MM-DD");
 
@@ -85,7 +87,7 @@ export default function InventoryDashboard() {
     area: s._id,
     qty: Math.round(s.totalQuantity),
   }));
-  console.log("area", areaStock);
+  // console.log("area", areaStock);
 
   // For grade distribution – computed from inventory (or use gradeSizeSummaries)
   const gradeDistribution = [
@@ -93,7 +95,7 @@ export default function InventoryDashboard() {
     { name: "Grade F", value: 0 },
     { name: "Grade B", value: 0 },
   ];
-  console.log("grade", gradeDistribution);
+  // console.log("grade", gradeDistribution);
 
   inventory.forEach((item) => {
     if (item.grade === "E") gradeDistribution[0].value += item.quantityMT;

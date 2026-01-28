@@ -53,6 +53,7 @@ export default function CoalDashboard() {
     loading,
     error,
     fetchAllInventory,
+    fetchInventory,
     fetchAreaWiseSummary,
     // fetchGradeSizeSummary,
   } = useInventoryStore();
@@ -61,11 +62,13 @@ export default function CoalDashboard() {
 
   // Load data on mount
   useEffect(() => {
-    fetchAllInventory();
+    fetchAllInventory(1, Number.MAX_SAFE_INTEGER);
+    fetchInventory();
     fetchAreaWiseSummary();
     fetchInwards(1, Number.MAX_SAFE_INTEGER);
+    fetchOutwards(1, Number.MAX_SAFE_INTEGER);
     // fetchGradeSizeSummary(); // if needed
-  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards]);
+  }, [fetchAllInventory, fetchInventory, fetchAreaWiseSummary, fetchInwards, fetchOutwards]);
 
   const today = dayjs().format("YYYY-MM-DD");
 
@@ -114,14 +117,16 @@ export default function CoalDashboard() {
       .filter((i) => !i.isDeleted)
       .forEach((item) => {
         if (item.type === "ROM") stats.ROM += item.quantityMT;
-        if (item.type === "STEAM") stats.STEAM += item.quantityMT;
-        if (item.type === "BOULDERS") stats.BOULDERS += item.quantityMT;
+        if (item.type === "Steam") stats.STEAM += item.quantityMT;
+        if (item.type === "Boulders") stats.BOULDERS += item.quantityMT;
       });
 
     return stats;
   }, [inventory]);
+  console.log("inven", inventory);
 
   const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
+  console.log("stema", formatMT(coalTypeStats.STEAM));
 
   const kpis = [
     {
@@ -131,7 +136,11 @@ export default function CoalDashboard() {
     },
     { label: "ROM Coal", value: formatMT(coalTypeStats.ROM), icon: Layers },
     { label: "Steam Coal", value: formatMT(coalTypeStats.STEAM), icon: Layers },
-    { label: "Boulders", value: formatMT(coalTypeStats.BOULDERS), icon: Layers },
+    {
+      label: "Boulders",
+      value: formatMT(coalTypeStats.BOULDERS),
+      icon: Layers,
+    },
     {
       label: "Vehicles Inward Today",
       value: stats.totalVehiclesToday,
@@ -179,91 +188,112 @@ export default function CoalDashboard() {
   const GRADE_COLORS = ["#6366f1", "#a855f7", "#c084fc"];
 
   // Monthly Coal Inward (MT)
-  const monthlyInward = [
-    { month: "Jan", value: 12500 },
-    { month: "Feb", value: 14800 },
-    { month: "Mar", value: 16200 },
-    { month: "Apr", value: 13900 },
-    { month: "May", value: 17800 },
-    { month: "Jun", value: 15500 },
-    { month: "Jul", value: 19200 },
-    { month: "Aug", value: 16800 },
-    { month: "Sep", value: 18400 },
-    { month: "Oct", value: 15900 },
-    { month: "Nov", value: 14200 },
-    { month: "Dec", value: 15100 },
-  ];
+  // const monthlyInward = [
+  //   { month: "Jan", value: 12500 },
+  //   { month: "Feb", value: 14800 },
+  //   { month: "Mar", value: 16200 },
+  //   { month: "Apr", value: 13900 },
+  //   { month: "May", value: 17800 },
+  //   { month: "Jun", value: 15500 },
+  //   { month: "Jul", value: 19200 },
+  //   { month: "Aug", value: 16800 },
+  //   { month: "Sep", value: 18400 },
+  //   { month: "Oct", value: 15900 },
+  //   { month: "Nov", value: 14200 },
+  //   { month: "Dec", value: 15100 },
+  // ];
+  const monthlyCoalMovement = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    [...inwards, ...outwards]
+      .filter((i) => !i.isDeleted)
+      .forEach((entry) => {
+        const month = dayjs(entry.createdAt).format("MMM");
+        map[month] = (map[month] || 0) + entry.netWeight;
+      });
+
+    const MONTHS = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    return MONTHS.map((m) => ({
+      month: m,
+      value: map[m] || 0,
+    }));
+  }, [inwards, outwards]);
 
   // Daily Coal Movement (MT)
-  const dailyFlow = [
-    { day: "Sun", value: 4200 },
-    { day: "Mon", value: 5800 },
-    { day: "Tue", value: 5300 },
-    { day: "Wed", value: 7100 },
-    { day: "Thu", value: 7600 },
-    { day: "Fri", value: 6200 },
-    { day: "Sat", value: 6800 },
-  ];
+  // const dailyFlow = [
+  //   { day: "Sun", value: 4200 },
+  //   { day: "Mon", value: 5800 },
+  //   { day: "Tue", value: 5300 },
+  //   { day: "Wed", value: 7100 },
+  //   { day: "Thu", value: 7600 },
+  //   { day: "Fri", value: 6200 },
+  //   { day: "Sat", value: 6800 },
+  // ];
+  const dailyCoalMovement = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    [...inwards, ...outwards]
+      .filter((i) => !i.isDeleted)
+      .forEach((entry) => {
+        const day = dayjs(entry.createdAt).format("ddd");
+        map[day] = (map[day] || 0) + entry.netWeight;
+      });
+
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    return DAYS.map((d) => ({
+      day: d,
+      value: map[d] || 0,
+    }));
+  }, [inwards, outwards]);
 
   // Space Utilization (by area)
-  const spaceUtilization = [
-    { area: "A", occupied: 45, total: 100, color: "#4f46e5" },
-    { area: "B", occupied: 38, total: 100, color: "#7c3aed" },
-    { area: "C", occupied: 62, total: 100, color: "#a855f7" },
-    { area: "D", occupied: 71, total: 100, color: "#c084fc" },
-    { area: "E", occupied: 54, total: 100, color: "#6366f1" },
-    { area: "F", occupied: 88, total: 100, color: "#8b5cf6" },
-    { area: "G", occupied: 93, total: 100, color: "#a78bfa" },
-  ];
+  const spaceUtilization = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    inventory
+      .filter((i) => !i.isDeleted)
+      .forEach((item) => {
+        map[item.area] = Math.max(map[item.area] || 0, item.quantityMT);
+      });
+
+    return Object.entries(map).map(([area, maxObserved]) => {
+      const occupied = inventory
+        .filter((i) => i.area === area && !i.isDeleted)
+        .reduce((s, i) => s + i.quantityMT, 0);
+
+      const capacity = Math.round(maxObserved * 1.2); // 20% buffer
+      const percent = Math.min(Math.round((occupied / capacity) * 100), 100);
+
+      return {
+        area,
+        occupied: percent,
+        occupiedMT: occupied,
+        capacityMT: capacity,
+        color: percent > 85 ? "#ef4444" : percent > 65 ? "#f59e0b" : "#6366f1",
+      };
+    });
+  }, [inventory]);
 
   // Recent Inwards & Outwards
-  const recentInwards = [
-    {
-      vehicle: "GJ-01-AB-1234",
-      quantity: "45.2 MT",
-      grade: "E",
-      type: "ROM",
-      time: "12 min ago",
-    },
-    {
-      vehicle: "GJ-12-EF-9012",
-      quantity: "46.8 MT",
-      grade: "B",
-      type: "Boulders",
-      time: "25 min ago",
-    },
-    {
-      vehicle: "GJ-03-GH-3456",
-      quantity: "44.0 MT",
-      grade: "E",
-      type: "Rejected",
-      time: "35 min ago",
-    },
-  ];
-
-  const recentOutwards = [
-    {
-      vehicle: "GJ-05-CD-5678",
-      quantity: "43.1 MT",
-      grade: "F",
-      type: "Steam",
-      time: "15 min ago",
-    },
-    {
-      vehicle: "GJ-12-EF-9012",
-      quantity: "46.8 MT",
-      grade: "B",
-      type: "Boulders",
-      time: "30 min ago",
-    },
-    {
-      vehicle: "GJ-03-GH-3456",
-      quantity: "44.0 MT",
-      grade: "E",
-      type: "Rejected",
-      time: "45 min ago",
-    },
-  ];
+  const recentInwards = useMemo(() => inwards.slice(0, 3), [inwards]);
+  // console.log("in", recentInwards);
+  const recentOutwards = useMemo(() => outwards.slice(0, 3), [outwards]);
+  // console.log("out", recentOutwards);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
@@ -333,7 +363,7 @@ export default function CoalDashboard() {
           <div className="lg:col-span-2 bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[340px] hover:border-indigo-500/40 transition-all duration-300">
             <h3 className="font-semibold mb-4">Monthly Coal Inward (MT)</h3>
             <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={monthlyInward}>
+              <BarChart data={monthlyCoalMovement}>
                 <CartesianGrid stroke="#374151" strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -378,7 +408,7 @@ export default function CoalDashboard() {
           <div className="lg:col-span-2 bg-gray-900/70 border border-gray-800 rounded-2xl p-6 h-[420px] hover:border-indigo-500/40 transition-all duration-300">
             <h3 className="font-semibold mb-4">Daily Coal Movement (MT)</h3>
             <ResponsiveContainer width="100%" height="85%">
-              <LineChart data={dailyFlow}>
+              <LineChart data={dailyCoalMovement}>
                 <CartesianGrid stroke="#374151" strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
@@ -422,7 +452,7 @@ export default function CoalDashboard() {
               </h3>
 
               {/* ❌ Removed overflow-x-auto */}
-              <div>
+              <div className="overflow-x-auto hide-scrollbar">
                 <table className="w-full text-sm table-fixed">
                   <thead className="text-gray-400 border-b border-gray-700">
                     <tr>
@@ -439,12 +469,12 @@ export default function CoalDashboard() {
                         key={i}
                         className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
                       >
-                        <td className="py-3 truncate">{r.vehicle}</td>
-                        <td className="py-3">{r.quantity}</td>
-                        <td className="py-3">{r.grade}</td>
-                        <td className="py-3">{r.type}</td>
+                        <td className="py-3 truncate">{r.vehicleNumber}</td>
+                        <td className="py-3">{r.netWeight}</td>
+                        <td className="py-3">{r.coalGrade}</td>
+                        <td className="py-3">{r.coalType}</td>
                         <td className="py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {r.time}
+                          {new Date(r.createdAt).toLocaleString()}
                         </td>
                       </tr>
                     ))}
