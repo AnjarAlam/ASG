@@ -31,6 +31,7 @@ import {
 import { useInventoryStore } from "@/store/inventory-store"; // adjust path
 import { useInwardStore } from "@/store/inward-store";
 import dayjs from "dayjs";
+import { useOutwardStore } from "@/store/outward-store";
 
 const COLORS = ["#6366f1", "#a855f7", "#c084fc", "#f472b6", "#fb923c"];
 
@@ -47,6 +48,7 @@ export default function InventoryDashboard() {
     fetchAreaWiseSummary,
     // fetchGradeSizeSummary,
   } = useInventoryStore();
+  const { outwards, fetchOutwards } = useOutwardStore();
   const { inwards, fetchInwards } = useInwardStore();
 
   // Load data on mount
@@ -54,8 +56,9 @@ export default function InventoryDashboard() {
     fetchAllInventory();
     fetchAreaWiseSummary();
     fetchInwards(1, Number.MAX_SAFE_INTEGER);
+    fetchOutwards(1, Number.MAX_SAFE_INTEGER);
     // fetchGradeSizeSummary(); // if needed
-  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards]);
+  }, [fetchAllInventory, fetchAreaWiseSummary, fetchInwards, fetchOutwards]);
   console.log("inventory", inventory);
 
   const today = dayjs().format("YYYY-MM-DD");
@@ -67,6 +70,14 @@ export default function InventoryDashboard() {
           dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
       ),
     [inwards],
+  );
+  const todayOutwards = useMemo(
+    () =>
+      outwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+      ),
+    [outwards],
   );
 
   // Prepare chart data
@@ -156,7 +167,7 @@ export default function InventoryDashboard() {
                   />
                 ),
               }, // ← placeholder – add real data later
-              { label: "OutWard Movements", value: "64", icon: Truck }, // ← placeholder – add real data later
+              { label: "OutWard Movements", value: todayOutwards.length, icon: Truck }, // ← placeholder – add real data later
               {
                 label: "Avg Stock / Area",
                 value:

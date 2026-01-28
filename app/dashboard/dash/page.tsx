@@ -33,6 +33,7 @@ import { useEffect, useMemo } from "react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useInwardStore } from "@/store/inward-store";
 import dayjs from "dayjs";
+import { useOutwardStore } from "@/store/outward-store";
 
 /* ================= DATA ================= */
 
@@ -55,6 +56,7 @@ export default function CoalDashboard() {
     fetchAreaWiseSummary,
     // fetchGradeSizeSummary,
   } = useInventoryStore();
+  const { outwards, fetchOutwards } = useOutwardStore();
   const { inwards, fetchInwards } = useInwardStore();
 
   // Load data on mount
@@ -75,19 +77,51 @@ export default function CoalDashboard() {
       ),
     [inwards],
   );
-  const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
+
+  const todayOutwards = useMemo(
+    () =>
+      outwards.filter(
+        (i) =>
+          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+      ),
+    [outwards],
+  );
+
   const stats = useMemo(() => {
     const totalNet = todayInwards.reduce((sum, i) => sum + i.netWeight, 0);
+    const totalNetOut = todayOutwards.reduce((sum, i) => sum + i.netWeight, 0);
 
     return {
       totalVehiclesToday: todayInwards.length,
       totalCoalInwardToday: `${totalNet.toFixed(2)} MT`,
+      totalVehiclesOutToday: todayOutwards.length,
+      totalCoalOutwardToday: `${totalNetOut.toFixed(2)} MT`,
       averageNetWeight: todayInwards.length
         ? `${(totalNet / todayInwards.length).toFixed(2)} MT`
         : "0 MT",
       rejectedCoalToday: "—",
     };
-  }, [todayInwards]);
+  }, [todayInwards, todayOutwards]);
+
+  const coalTypeStats = useMemo(() => {
+    const stats = {
+      ROM: 0,
+      STEAM: 0,
+      BOULDERS: 0,
+    };
+
+    inventory
+      .filter((i) => !i.isDeleted)
+      .forEach((item) => {
+        if (item.type === "ROM") stats.ROM += item.quantityMT;
+        if (item.type === "STEAM") stats.STEAM += item.quantityMT;
+        if (item.type === "BOULDERS") stats.BOULDERS += item.quantityMT;
+      });
+
+    return stats;
+  }, [inventory]);
+
+  const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
 
   const kpis = [
     {
@@ -95,15 +129,19 @@ export default function CoalDashboard() {
       value: formatMT(totalStockMT),
       icon: Warehouse,
     },
-    { label: "ROM Coal", value: "6,320 MT", icon: Layers },
-    { label: "Steam Coal", value: "4,180 MT", icon: Layers },
-    { label: "Boulders", value: "2,940 MT", icon: Layers },
+    { label: "ROM Coal", value: formatMT(coalTypeStats.ROM), icon: Layers },
+    { label: "Steam Coal", value: formatMT(coalTypeStats.STEAM), icon: Layers },
+    { label: "Boulders", value: formatMT(coalTypeStats.BOULDERS), icon: Layers },
     {
       label: "Vehicles Inward Today",
       value: stats.totalVehiclesToday,
       icon: ArrowDownCircle,
     },
-    { label: "Vehicles Outward Today", value: "26", icon: ArrowUpCircle },
+    {
+      label: "Vehicles Outward Today",
+      value: todayOutwards.length,
+      icon: ArrowUpCircle,
+    },
     {
       label: "Coal Inward Today",
       value: stats.totalCoalInwardToday,
@@ -114,7 +152,11 @@ export default function CoalDashboard() {
         />
       ),
     },
-    { label: "Coal Outward Today", value: "1,112 MT", icon: Truck },
+    {
+      label: "Coal Outward Today",
+      value: stats.totalCoalOutwardToday,
+      icon: Truck,
+    },
     // { label: "Rejected Coal", value: "98 MT", icon: AlertTriangle },
     // { label: "Avg Weighment Time", value: "3.4 min", icon: Gauge },
     // { label: "Pending Vehicles", value: "7", icon: Clock },
