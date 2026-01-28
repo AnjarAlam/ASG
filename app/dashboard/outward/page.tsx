@@ -24,21 +24,18 @@ import {
   Legend,
 } from "recharts";
 
-// ── dayjs + plugins ────────────────────────────────────────────────
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
 dayjs.extend(relativeTime);
 
-// ── Zustand store ──────────────────────────────────────────────────
-import { useOutwardStore } from "@/store/outward-store"; // ← adjust path if needed
+import { useOutwardStore } from "@/store/outward-store"; 
 
-// Helper: format weight as MT (your style - whole or .00)
 const formatWeight = (kg: number = 0) => {
   return `${(kg / 1000).toFixed(2)} MT`;
 };
 
-export default function OutwardDashboard() {
+export default function OutwardDashboard() {  
   const router = useRouter();
 
   const {
@@ -50,20 +47,19 @@ export default function OutwardDashboard() {
     fetchLocalOutwards,
   } = useOutwardStore();
 
-  // Fetch data
+
   useEffect(() => {
-    fetchOutwards(1, 30);       // more items → better recent + trend
+    fetchOutwards(1, Number.MAX_SAFE_INTEGER);     
     fetchLocalOutwards();
   }, [fetchOutwards, fetchLocalOutwards]);
 
-  // Combine & sort newest first
   const allOutwards = useMemo(() => {
     return [...outwards, ...localOutwards]
       .filter((o) => !o.isDeleted)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [outwards, localOutwards]);
 
-  // Today filter (using createdAt fallback)
+
   const today = dayjs().format("YYYY-MM-DD");
 
   const todayOutwards = useMemo(
@@ -74,24 +70,22 @@ export default function OutwardDashboard() {
     [allOutwards]
   );
 
-  // Stats (your original logic)
   const stats = useMemo(() => {
-    const totalNet = todayOutwards.reduce((sum, o) => sum + (o.netWeight || 0), 0);
+    const totalNetOut = todayOutwards.reduce((sum, i) => sum + i.netWeight, 0);
 
     return {
       totalVehiclesToday: todayOutwards.length,
-      totalCoalOutwardToday: formatWeight(totalNet),
+      totalCoalOutwardToday: `${totalNetOut.toFixed(2)} MT`,
       averageNetWeight: todayOutwards.length
-        ? formatWeight(totalNet / todayOutwards.length)
+        ? formatWeight(totalNetOut / todayOutwards.length)
         : "0.00 MT",
       rejectedCoalToday: "—", 
     };
   }, [todayOutwards]);
 
-  // Recent entries (last 4 like your code)
   const recentOutwards = useMemo(() => {
     return allOutwards
-      .slice(0, 4)
+      .slice(0, 3)
       .map((entry) => ({
         vehicle: entry.vehicleNumber || "—",
         customer: entry.customerName || "—",
@@ -104,10 +98,9 @@ export default function OutwardDashboard() {
       }));
   }, [allOutwards]);
 
-  // Recent tokens (last 4 + fallback token number)
   const recentOutwardTokens = useMemo(() => {
     return allOutwards
-      .slice(0, 4)
+      .slice(0, 3)
       .map((entry) => ({
         tokenNumber: entry.tokenNumber || `TO-${entry._id?.slice(-8) || "XXXX"}`,
         vehicle: entry.vehicleNumber || "—",
@@ -121,7 +114,7 @@ export default function OutwardDashboard() {
       }));
   }, [allOutwards]);
 
-  // Grade distribution today
+
   const gradeDistribution = useMemo(() => {
     const map: Record<string, number> = {};
 
@@ -138,7 +131,6 @@ export default function OutwardDashboard() {
       .sort((a, b) => b.value - a.value);
   }, [todayOutwards]);
 
-  // Outward trend last 7 days – area wise
   const outwardTrend = useMemo(() => {
     const areas = ["A", "B", "C", "D", "E", "F", "G"];
 
@@ -164,7 +156,6 @@ export default function OutwardDashboard() {
       });
   }, [allOutwards]);
 
-  // ── Loading overlay ───────────────────────────────────────────────
   if (loading && allOutwards.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
@@ -178,7 +169,7 @@ export default function OutwardDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-gray-100 pb-8">
-      {/* ================= HEADER ================= */}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -205,7 +196,6 @@ export default function OutwardDashboard() {
         </div>
       </div>
 
-      {/* Error message */}
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-red-950/60 border border-red-800 rounded-xl p-4 flex items-center gap-3 text-red-300">
@@ -216,7 +206,7 @@ export default function OutwardDashboard() {
       )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 sm:space-y-10">
-        {/* KPI CARDS */}
+
         <section>
           <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-200">
             Today's Outward Summary
@@ -245,9 +235,8 @@ export default function OutwardDashboard() {
           </div>
         </section>
 
-        {/* Recent lists */}
         <section className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8">
-          {/* Recent Outward Entries */}
+
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
             <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
               <Truck className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
@@ -284,7 +273,6 @@ export default function OutwardDashboard() {
             </div>
           </div>
 
-          {/* Recent Outward Tokens */}
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
             <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
               <Package className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
@@ -322,7 +310,6 @@ export default function OutwardDashboard() {
           </div>
         </section>
 
-        {/* Grade Distribution */}
         <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
           <h3 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2.5">
             <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
@@ -388,7 +375,6 @@ export default function OutwardDashboard() {
           </div>
         </section>
 
-        {/* Outward Trend */}
         <section className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 sm:p-6 shadow-md">
           <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-5 flex items-center gap-2.5">
             <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />

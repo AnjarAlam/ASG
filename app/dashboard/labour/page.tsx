@@ -155,15 +155,6 @@ export default function LabourDashboard() {
         r.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-indigo-400 text-xl animate-pulse">
-          Loading labour records...
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

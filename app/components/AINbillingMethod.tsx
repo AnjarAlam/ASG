@@ -28,40 +28,37 @@ export default function BillingMethodSectionAIN({
   setFormData,
   handleChange,
 }: BillingMethodAINProps) {
-  // Show global rate/weight fields unless only weight or different is active
   const showTopFields = !(
     (formData.billingMethods?.includes("different") ||
       formData.billingMethods?.includes("weight")) &&
     !formData.billingMethods?.includes("half")
   );
 
-  // ────────────────────────────────────────────────
-  // HALF BILLING – real-time calculation
-  // ────────────────────────────────────────────────
+
   useEffect(() => {
     if (!formData.billingMethods?.includes("half")) return;
 
-    const totalCoal = Number(formData.netWeight) || 0;
+    const totalCoal   = Number(formData.netWeight) || 0;
     const billingRate = Number(formData.billingRate) || 0;
-    const actualRate = Number(formData.actualRate) || 0;
-    const gstRate = Number(formData.gstRate ?? 18);
+    const actualRate  = Number(formData.actualRate)  || 0;
+    const gstRate     = Number(formData.gstRate ?? 18);
 
     if (totalCoal <= 0 || billingRate <= 0) return;
 
-    const base = totalCoal * billingRate;
-    const gst = base * (gstRate / 100);
-    const withGst = base + gst;
-    const cash = totalCoal * (actualRate - billingRate);
-    const tcs = withGst * 0.01;
+    const base         = totalCoal * billingRate;
+    const gstAmount    = base * (gstRate / 100);
+    const billingWithGst = base + gstAmount;
+    const cashAmount   = totalCoal * (actualRate - billingRate);
+    const tcsAmount    = billingWithGst * 0.01;
 
     setFormData((prev: any) => ({
       ...prev,
       half: {
         ...prev.half,
-        billingWithGst: withGst.toFixed(2),
-        cashAmount: cash.toFixed(2),
-        gstAmount: gst.toFixed(2),
-        tcsAmount: tcs.toFixed(2),
+        billingWithGst: billingWithGst.toFixed(2),
+        cashAmount: cashAmount.toFixed(2),
+        gstAmount: gstAmount.toFixed(2),
+        tcsAmount: tcsAmount.toFixed(2),
       },
     }));
   }, [
@@ -72,16 +69,14 @@ export default function BillingMethodSectionAIN({
     formData.gstRate,
   ]);
 
-  // ────────────────────────────────────────────────
-  // HALF WEIGHT BILLING – multiple lines
-  // ────────────────────────────────────────────────
+
   useEffect(() => {
     if (!formData.billingMethods?.includes("weight") || !Array.isArray(formData.weight?.lines))
       return;
 
     let totalWithGst = 0;
-    let totalCash = 0;
-    let totalGst = 0;
+    let totalCash    = 0;
+    let totalGst     = 0;
 
     const gstRate = Number(formData.gstRate ?? 18);
 
@@ -92,17 +87,17 @@ export default function BillingMethodSectionAIN({
 
       if (wt <= 0) continue;
 
-      const base = wt * br;
-      const gstVal = base * (gstRate / 100);
-      const withGstVal = base + gstVal;
-      const cashVal = wt * (ar - br);
+      const base       = wt * br;
+      const gstAmount  = base * (gstRate / 100);
+      const withGst    = base + gstAmount;
+      const cash       = wt * (ar - br);
 
-      totalWithGst += withGstVal;
-      totalCash += cashVal;
-      totalGst += gstVal;
+      totalWithGst += withGst;
+      totalCash    += cash;
+      totalGst     += gstAmount;
     }
 
-    const totalTcs = totalWithGst * 0.01;
+    const tcsAmount = totalWithGst * 0.01;
 
     setFormData((prev: any) => ({
       ...prev,
@@ -111,14 +106,11 @@ export default function BillingMethodSectionAIN({
         billingWithGst: totalWithGst.toFixed(2),
         cashAmount: totalCash.toFixed(2),
         gstAmount: totalGst.toFixed(2),
-        tcsAmount: totalTcs.toFixed(2),
+        tcsAmount: tcsAmount.toFixed(2),
       },
     }));
   }, [formData.billingMethods, formData.weight?.lines, formData.gstRate]);
 
-  // ────────────────────────────────────────────────
-  // DIFFERENT MATERIAL BILLING – multiple materials
-  // ────────────────────────────────────────────────
   useEffect(() => {
     if (
       !formData.billingMethods?.includes("different") ||
@@ -127,29 +119,29 @@ export default function BillingMethodSectionAIN({
       return;
 
     let totalWithGst = 0;
-    let totalCash = 0;
-    let totalGst = 0;
+    let totalCash    = 0;
+    let totalGst     = 0;
 
     const gstRate = Number(formData.gstRate ?? 18);
 
     for (const mat of formData.different.materials) {
       const qty = Number(mat.quantity) || 0;
-      const br = Number(mat.billingRate) || 0;
-      const ar = Number(mat.actualRate) || 0;
+      const br  = Number(mat.billingRate) || 0;
+      const ar  = Number(mat.actualRate) || 0;
 
       if (qty <= 0) continue;
 
-      const base = qty * br;
-      const gstVal = base * (gstRate / 100);
-      const withGstVal = base + gstVal;
-      const cashVal = qty * (ar - br);
+      const base       = qty * br;
+      const gstAmount  = base * (gstRate / 100);
+      const withGst    = base + gstAmount;
+      const cash       = qty * (ar - br);
 
-      totalWithGst += withGstVal;
-      totalCash += cashVal;
-      totalGst += gstVal;
+      totalWithGst += withGst;
+      totalCash    += cash;
+      totalGst     += gstAmount;
     }
 
-    const totalTcs = totalWithGst * 0.01;
+    const tcsAmount = totalWithGst * 0.01;
 
     setFormData((prev: any) => ({
       ...prev,
@@ -158,7 +150,7 @@ export default function BillingMethodSectionAIN({
         billingWithGst: totalWithGst.toFixed(2),
         cashAmount: totalCash.toFixed(2),
         gstAmount: totalGst.toFixed(2),
-        tcsAmount: totalTcs.toFixed(2),
+        tcsAmount: tcsAmount.toFixed(2),
       },
     }));
   }, [formData.billingMethods, formData.different?.materials, formData.gstRate]);
@@ -218,7 +210,7 @@ export default function BillingMethodSectionAIN({
         Billing & Rates
       </h2>
 
-      {/* Top global fields */}
+      {/* Top global inputs */}
       {showTopFields && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <div className="relative">
@@ -289,8 +281,8 @@ export default function BillingMethodSectionAIN({
       )}
 
       <div className="space-y-8 pb-20">
-        {/* HALF BILLING */}
-        {formData.billingMethods?.includes("half") && (
+        {/* ── HALF BILLING ── */}
+        {formData.billingMethods?.includes("half") && formData.half && (
           <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-semibold text-violet-300">
@@ -363,8 +355,8 @@ export default function BillingMethodSectionAIN({
           </div>
         )}
 
-        {/* HALF WEIGHT BILLING */}
-        {formData.billingMethods?.includes("weight") && (
+        {/* ── HALF WEIGHT BILLING ── */}
+        {formData.billingMethods?.includes("weight") && formData.weight && (
           <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-semibold text-violet-300">
@@ -380,103 +372,102 @@ export default function BillingMethodSectionAIN({
             </div>
 
             <div className="space-y-6 mb-10">
-              {Array.isArray(formData.weight?.lines) &&
-                formData.weight.lines.map((line: any, index: number) => (
-                  <div
-                    key={index}
-                    className="bg-gray-900/30 p-6 rounded-lg border border-gray-800/50"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
-                      <div className="sm:col-span-4 relative">
+              {formData.weight.lines.map((line: any, index: number) => (
+                <div
+                  key={index}
+                  className="bg-gray-900/30 p-6 rounded-lg border border-gray-800/50"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
+                    <div className="sm:col-span-4 relative">
+                      <input
+                        type="text"
+                        value={line.loading || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((prev) => {
+                            const lines = [...prev.weight.lines];
+                            lines[index] = { ...lines[index], loading: val };
+                            return { ...prev, weight: { ...prev.weight, lines } };
+                          });
+                        }}
+                        className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white bg-transparent"
+                        placeholder="0.00"
+                      />
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Loading Weight (MT)
+                      </label>
+                    </div>
+
+                    <div className="sm:col-span-4 relative">
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
+                          ₹
+                        </span>
                         <input
                           type="text"
-                          value={line.loading || ""}
+                          value={line.billingRate || ""}
                           onChange={(e) => {
                             const val = e.target.value;
                             setFormData((prev) => {
-                              const lines = [...(prev.weight?.lines || [])];
-                              lines[index] = { ...lines[index], loading: val };
+                              const lines = [...prev.weight.lines];
+                              lines[index] = { ...lines[index], billingRate: val };
                               return { ...prev, weight: { ...prev.weight, lines } };
                             });
                           }}
-                          className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white bg-transparent"
+                          className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
                           placeholder="0.00"
                         />
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Loading Weight (MT)
-                        </label>
                       </div>
-
-                      <div className="sm:col-span-4 relative">
-                        <div className="flex">
-                          <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
-                            ₹
-                          </span>
-                          <input
-                            type="text"
-                            value={line.billingRate || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormData((prev) => {
-                                const lines = [...(prev.weight?.lines || [])];
-                                lines[index] = { ...lines[index], billingRate: val };
-                                return { ...prev, weight: { ...prev.weight, lines } };
-                              });
-                            }}
-                            className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Billing Rate (₹/MT)
-                        </label>
-                      </div>
-
-                      <div className="sm:col-span-4 relative">
-                        <div className="flex">
-                          <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
-                            ₹
-                          </span>
-                          <input
-                            type="text"
-                            value={line.actualRate || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormData((prev) => {
-                                const lines = [...(prev.weight?.lines || [])];
-                                lines[index] = { ...lines[index], actualRate: val };
-                                return { ...prev, weight: { ...prev.weight, lines } };
-                              });
-                            }}
-                            className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Actual Rate (₹/MT)
-                        </label>
-                      </div>
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Billing Rate (₹/MT)
+                      </label>
                     </div>
 
-                    {formData.weight.lines.length > 1 && (
-                      <div className="flex justify-end mt-4">
-                        <button
-                          type="button"
-                          onClick={() => {
+                    <div className="sm:col-span-4 relative">
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
+                          ₹
+                        </span>
+                        <input
+                          type="text"
+                          value={line.actualRate || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setFormData((prev) => {
-                              const lines = prev.weight.lines.filter((_: any, i: number) => i !== index);
+                              const lines = [...prev.weight.lines];
+                              lines[index] = { ...lines[index], actualRate: val };
                               return { ...prev, weight: { ...prev.weight, lines } };
                             });
                           }}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg hover:bg-red-950/40 transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                          Remove Line
-                        </button>
+                          className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
+                          placeholder="0.00"
+                        />
                       </div>
-                    )}
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Actual Rate (₹/MT)
+                      </label>
+                    </div>
                   </div>
-                ))}
+
+                  {formData.weight.lines.length > 1 && (
+                    <div className="flex justify-end mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => {
+                            const lines = prev.weight.lines.filter((_: any, i: number) => i !== index);
+                            return { ...prev, weight: { ...prev.weight, lines } };
+                          });
+                        }}
+                        className="flex items-center gap-2 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg hover:bg-red-950/40 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        Remove Line
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
 
               <button
                 type="button"
@@ -549,13 +540,13 @@ export default function BillingMethodSectionAIN({
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-6">
-              Calculated from loading weights × billing/actual rates
+              Calculated from all loading lines
             </p>
           </div>
         )}
 
-        {/* DIFFERENT MATERIAL BILLING */}
-        {formData.billingMethods?.includes("different") && (
+        {/* ── DIFFERENT MATERIAL BILLING ── */}
+        {formData.billingMethods?.includes("different") && formData.different && (
           <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-semibold text-violet-300">
@@ -571,149 +562,127 @@ export default function BillingMethodSectionAIN({
             </div>
 
             <div className="space-y-6 mb-10">
-              {Array.isArray(formData.different?.materials) &&
-                formData.different.materials.map((material: any, index: number) => (
-                  <div
-                    key={index}
-                    className="bg-gray-900/30 p-6 rounded-lg border border-gray-800/50"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
-                      <div className="sm:col-span-4 relative">
-                        <select
-                          value={material.name || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              different: {
-                                ...prev.different,
-                                materials: prev.different.materials.map((m: any, i: number) =>
-                                  i === index ? { ...m, name: val } : m
-                                ),
-                              },
-                            }));
-                          }}
-                          className="peer w-full px-4 py-3.5 bg-gray-900/60 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white appearance-none"
-                        >
-                          <option value="">Select Material</option>
-                          {MATERIAL_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Material Type
-                        </label>
-                      </div>
-
-                      <div className="sm:col-span-2 relative">
-                        <input
-                          type="text"
-                          value={material.quantity || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              different: {
-                                ...prev.different,
-                                materials: prev.different.materials.map((m: any, i: number) =>
-                                  i === index ? { ...m, quantity: val } : m
-                                ),
-                              },
-                            }));
-                          }}
-                          className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white bg-transparent"
-                          placeholder="0.00"
-                        />
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Quantity (MT)
-                        </label>
-                      </div>
-
-                      <div className="sm:col-span-3 relative">
-                        <div className="flex">
-                          <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
-                            ₹
-                          </span>
-                          <input
-                            type="text"
-                            value={material.billingRate || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormData((prev) => ({
-                                ...prev,
-                                different: {
-                                  ...prev.different,
-                                  materials: prev.different.materials.map((m: any, i: number) =>
-                                    i === index ? { ...m, billingRate: val } : m
-                                  ),
-                                },
-                              }));
-                            }}
-                            className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Billing Rate (₹/MT)
-                        </label>
-                      </div>
-
-                      <div className="sm:col-span-3 relative">
-                        <div className="flex">
-                          <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
-                            ₹
-                          </span>
-                          <input
-                            type="text"
-                            value={material.actualRate || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormData((prev) => ({
-                                ...prev,
-                                different: {
-                                  ...prev.different,
-                                  materials: prev.different.materials.map((m: any, i: number) =>
-                                    i === index ? { ...m, actualRate: val } : m
-                                  ),
-                                },
-                              }));
-                            }}
-                            className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
-                          Actual Rate (₹/MT)
-                        </label>
-                      </div>
+              {formData.different.materials.map((material: any, index: number) => (
+                <div
+                  key={index}
+                  className="bg-gray-900/30 p-6 rounded-lg border border-gray-800/50"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
+                    <div className="sm:col-span-4 relative">
+                      <select
+                        value={material.name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((prev) => {
+                            const mats = [...prev.different.materials];
+                            mats[index] = { ...mats[index], name: val };
+                            return { ...prev, different: { ...prev.different, materials: mats } };
+                          });
+                        }}
+                        className="peer w-full px-4 py-3.5 bg-gray-900/60 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white appearance-none"
+                      >
+                        <option value="">Select Material</option>
+                        {MATERIAL_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Material Type
+                      </label>
                     </div>
 
-                    {formData.different.materials.length > 1 && (
-                      <div className="flex justify-end mt-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              different: {
-                                ...prev.different,
-                                materials: prev.different.materials.filter(
-                                  (_: any, i: number) => i !== index
-                                ),
-                              },
-                            }));
+                    <div className="sm:col-span-2 relative">
+                      <input
+                        type="text"
+                        value={material.quantity || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((prev) => {
+                            const mats = [...prev.different.materials];
+                            mats[index] = { ...mats[index], quantity: val };
+                            return { ...prev, different: { ...prev.different, materials: mats } };
+                          });
+                        }}
+                        className="peer w-full px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-md outline-none text-white bg-transparent"
+                        placeholder="0.00"
+                      />
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Quantity (MT)
+                      </label>
+                    </div>
+
+                    <div className="sm:col-span-3 relative">
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
+                          ₹
+                        </span>
+                        <input
+                          type="text"
+                          value={material.billingRate || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData((prev) => {
+                              const mats = [...prev.different.materials];
+                              mats[index] = { ...mats[index], billingRate: val };
+                              return { ...prev, different: { ...prev.different, materials: mats } };
+                            });
                           }}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg hover:bg-red-950/40 transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                          Remove Line
-                        </button>
+                          className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
+                          placeholder="0.00"
+                        />
                       </div>
-                    )}
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Billing Rate (₹/MT)
+                      </label>
+                    </div>
+
+                    <div className="sm:col-span-3 relative">
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-gray-300">
+                          ₹
+                        </span>
+                        <input
+                          type="text"
+                          value={material.actualRate || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData((prev) => {
+                              const mats = [...prev.different.materials];
+                              mats[index] = { ...mats[index], actualRate: val };
+                              return { ...prev, different: { ...prev.different, materials: mats } };
+                            });
+                          }}
+                          className="peer flex-1 px-4 py-3.5 border-b-2 border-gray-700 focus:border-violet-500 rounded-r-md outline-none text-white bg-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <label className="absolute left-4 -top-2 px-2 bg-gray-800 text-xs font-medium text-gray-400 peer-focus:text-violet-400">
+                        Actual Rate (₹/MT)
+                      </label>
+                    </div>
                   </div>
-                ))}
+
+                  {formData.different.materials.length > 1 && (
+                    <div className="flex justify-end mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => {
+                            const mats = prev.different.materials.filter((_: any, i: number) => i !== index);
+                            return { ...prev, different: { ...prev.different, materials: mats } };
+                          });
+                        }}
+                        className="flex items-center gap-2 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg hover:bg-red-950/40 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        Remove Line
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
 
               <button
                 type="button"
@@ -789,13 +758,13 @@ export default function BillingMethodSectionAIN({
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-6">
-              Calculated from entered materials × quantities × rates
+              Calculated from all material lines
             </p>
           </div>
         )}
       </div>
 
-      {/* Add Billing Method – bottom right fixed on mobile */}
+      {/* Add Billing Method selector */}
       <div className="fixed bottom-6 right-6 z-10 md:static md:flex md:justify-end">
         <div className="bg-gray-900/90 backdrop-blur-sm border border-violet-700/40 rounded-xl shadow-2xl p-4 w-80 md:w-auto">
           <h3 className="text-sm font-medium mb-3 text-violet-300 flex items-center gap-2">

@@ -58,6 +58,19 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
     documents: [] as File[],
     images: [] as File[],
     billingMethods: [] as string[],
+
+    // Billing sub-documents
+    halfBilling: null as null | { cashAmount: string; billingTotalAmount: string; tax: string },
+    halfWeightBilling: null as null | { cashAmount: string; billingTotalAmount: string; tax: string },
+    differentMaterial: [] as Array<{
+      name: string;
+      quantity: string;
+      billingRate: string;
+      actualRate: string;
+    }>,
+
+    gst: "18",
+    tcsRate: "1",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -184,34 +197,44 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
         note: (formData.munshiyanaRemarks || formData.labourRemarks || "No remarks").trim(),
         dispatchDateTime: new Date().toISOString(),
         labourIds: formData.labourId.trim() ? [formData.labourId.trim()] : [],
-
-        // ────────────────────────────────
-        // Most common fixes for 400 / validation errors
-        // ────────────────────────────────
         instructions: formData.specialInstructions?.trim() || "nil",
 
         images: formData.images.length > 0 ? formData.images.map((f) => f.name) : [],
         documents: formData.documents.length > 0 ? formData.documents.map((f) => f.name) : [],
 
         outwardType: "GLOBAL",
+        vehicleSize: formData.munshiyanaSize === "large" ? "LARGE" : "SMALL",
 
-        vehicleSize: "SMALL",
         gst: 18,
         tcsRate: 1,
 
-        // Required subdocuments – minimal shape
-        halfBilling: {
-          cashAmount: 0,
-          billingTotalAmount: 0,
-          tax: 0,
-        },
-        halfWeightBilling: {
-          cashAmount: 0,
-          billingTotalAmount: 0,
-          tax: 0,
-        },
+        // ── Real conditional sub-documents ───────────────────────────────────────
+        halfBilling:
+          formData.billingMethods.includes("half") && formData.halfBilling
+            ? {
+                cashAmount: Number(formData.halfBilling.cashAmount) || 0,
+                billingTotalAmount: Number(formData.halfBilling.billingTotalAmount) || 0,
+                tax: Number(formData.halfBilling.tax) || 0,
+              }
+            : undefined,
 
-        differentMaterial: [],
+        halfWeightBilling:
+          formData.billingMethods.includes("weight") && formData.halfWeightBilling
+            ? {
+                cashAmount: Number(formData.halfWeightBilling.cashAmount) || 0,
+                billingTotalAmount: Number(formData.halfWeightBilling.billingTotalAmount) || 0,
+                tax: Number(formData.halfWeightBilling.tax) || 0,
+              }
+            : undefined,
+
+        differentMaterial: formData.billingMethods.includes("different")
+          ? formData.differentMaterial.map((m) => ({
+              name: m.name || "",
+              quantity: Number(m.quantity) || 0,
+              billingRate: Number(m.billingRate) || 0,
+              actualRate: Number(m.actualRate) || 0,
+            }))
+          : [],
       };
 
       console.log("PAYLOAD →", JSON.stringify(payload, null, 2));
@@ -233,18 +256,14 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
     }
   };
 
+  // ────────────────────────────────────────────────────────────────
+  // JSX ─────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-transparent text-gray-100">
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Token display */}
-          {/* <div className="bg-violet-950/30 border border-violet-800/40 rounded-xl p-4 text-center">
-            <p className="text-sm text-violet-300 font-medium">Outward Token</p>
-            <p className="text-xl font-mono font-bold text-violet-200 mt-1 tracking-wide">
-              {formData.tokenNumber || outwardToken || "No token"}
-            </p>
-          </div> */}
-
           {/* Vehicle & Party + Coal Details */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl">

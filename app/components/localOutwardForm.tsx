@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import BillingMethodSection from "./ASGbillingMethod";
+import BillingMethodSection from "./ASGbillingMethod"; // same component as global
 import {
   Save,
   X,
@@ -13,15 +13,15 @@ import {
   Upload,
   Trash2,
 } from "lucide-react";
-import { useOutwardStore } from "../../store/outward-store";
+import { useOutwardLocalStore } from "../../store/outward-local-store"; // ← your local store
 
-interface GlobalOutwardFormProps {
+interface LocalOutwardFormProps {
   outwardToken: string;
 }
 
-export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormProps) {
+export default function LocalOutwardForm({ outwardToken }: LocalOutwardFormProps) {
   const router = useRouter();
-  const { createOutward, loading: storeLoading } = useOutwardStore();
+  const { loading: storeLoading, createLocalOutward } = useOutwardLocalStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -33,9 +33,6 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
     labourId: "",
     vehicleNumber: "",
     partyName: "",
-    destination: "",
-    driverName: "",
-    driverContact: "",
     coalGradeType: "E",
     grade: "E",
     material: "ROM",
@@ -49,11 +46,38 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
     munshiyanaRemarks: "",
     labourRemarks: "",
     specialInstructions: "",
-    transportationFee: "",
-    advanceFee: "",
     documents: [] as File[],
     images: [] as File[],
     billingMethods: [] as string[],
+
+    // Billing sub-objects (same structure as global)
+    half: null as null | {
+      billingWithGst: string;
+      cashAmount: string;
+      gstAmount: string;
+      tcsAmount: string;
+    },
+    weight: null as null | {
+      lines: Array<{ loading: string; billingRate: string; actualRate: string }>;
+      billingWithGst: string;
+      cashAmount: string;
+      gstAmount: string;
+      tcsAmount: string;
+    },
+    different: null as null | {
+      materials: Array<{
+        name: string;
+        quantity: string;
+        billingRate: string;
+        actualRate: string;
+      }>;
+      billingWithGst: string;
+      cashAmount: string;
+      gstAmount: string;
+      tcsAmount: string;
+    },
+
+    gstRate: "18",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -81,6 +105,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
         (newData as any)[name] = value;
       }
 
+      // Auto-calculate net weight
       if (name === "grossWeight" || name === "tareWeight") {
         const gross = Number(newData.grossWeight) || 0;
         const tare = Number(newData.tareWeight) || 0;
@@ -136,9 +161,6 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
 
     if (!formData.vehicleNumber.trim()) newErrors.vehicleNumber = "Required";
     if (!formData.partyName.trim()) newErrors.partyName = "Required";
-    if (!formData.destination.trim()) newErrors.destination = "Required";
-    if (!formData.driverName.trim()) newErrors.driverName = "Required";
-    if (!formData.driverContact.trim()) newErrors.driverContact = "Required";
     if (!formData.grossWeight || Number(formData.grossWeight) <= 0)
       newErrors.grossWeight = "Enter valid gross weight";
     if (Number(formData.tareWeight) < 0) newErrors.tareWeight = "Tare cannot be negative";
@@ -161,56 +183,63 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
         tokenNumber: formData.tokenNumber || outwardToken || "AUTO",
         vehicleNumber: formData.vehicleNumber.trim() || "UNKNOWN",
         customerName: formData.partyName.trim() || "Unknown Party",
-        destination: formData.destination.trim() || "",
-        transportingFee: String(Number(formData.transportationFee) || 0),
-        advanceFee: String(Number(formData.advanceFee) || 0),
-        driverName: formData.driverName.trim() || "",
-        driverContact: formData.driverContact.trim() || "",
+        vehicleSize: formData.munshiyanaSize === "large" ? "LARGE" : "SMALL",
+        munshiana: formData.munshiyanaPrice || "0",
+        note: (formData.munshiyanaRemarks || formData.labourRemarks || "No remarks").trim(),
         coalGrade: formData.grade || "E",
         coalType: formData.material || "ROM",
         coalSize: formData.size || "0-10",
         area: formData.area || "",
         grossWeight: Number(formData.grossWeight) || 0,
         tareWeight: Number(formData.tareWeight) || 0,
-        netWeight: Number(formData.netWeight) || 0,
-        billingRate: String(Number(formData.billingRate) || 0),
-        actualRate: String(Number(formData.actualRate) || 0),
-        munshiana: String(Number(formData.munshiyanaPrice) || 0),
-        note: (formData.munshiyanaRemarks || formData.labourRemarks || "No remarks").trim(),
         dispatchDateTime: new Date().toISOString(),
+        gst: formData.gstRate || "18",
+        billingRate: formData.billingRate || "0",
+        actualRate: formData.actualRate || "0",
+        tcsRate: "1", // or get from form if you add field
         labourIds: formData.labourId.trim() ? [formData.labourId.trim()] : [],
-
-        instructions: formData.specialInstructions?.trim() || "nil",
+        instructions: formData.specialInstructions?.trim()
+          ? [formData.specialInstructions.trim()]
+          : [],
 
         images: formData.images.length > 0 ? formData.images.map((f) => f.name) : [],
         documents: formData.documents.length > 0 ? formData.documents.map((f) => f.name) : [],
 
-        outwardType: "GLOBAL",
+        // Billing sub-documents – using same structure as global
+        halfBilling:
+          formData.billingMethods.includes("half") && formData.half
+            ? {
+                cashAmount: Number(formData.half.cashAmount) || 0,
+                billingTotalAmount: Number(formData.half.billingWithGst) || 0,
+                tax: (Number(formData.half.gstAmount) + Number(formData.half.tcsAmount)) || 0,
+              }
+            : undefined,
 
-        vehicleSize: "SMALL",
-        gst: "18",
-        tcsRate: "0",
+        halfWeightBilling:
+          formData.billingMethods.includes("weight") && formData.weight
+            ? {
+                cashAmount: Number(formData.weight.cashAmount) || 0,
+                billingTotalAmount: Number(formData.weight.billingWithGst) || 0,
+                tax: (Number(formData.weight.gstAmount) + Number(formData.weight.tcsAmount)) || 0,
+              }
+            : undefined,
 
-        halfBilling: {
-          cashAmount: 0,
-          billingTotalAmount: 0,
-          tax: 0,
-        },
-
-        halfWeightBilling: {
-          cashAmount: 0,
-          billingTotalAmount: 0,
-          tax: 0,
-        },
-
-        differentMaterial: [],
+        differentMaterial:
+          formData.billingMethods.includes("different") && formData.different
+            ? formData.different.materials.map((m: any) => ({
+                name: m.name || "",
+                quantity: Number(m.quantity) || 0,
+                billingRate: Number(m.billingRate) || 0,
+                actualRate: Number(m.actualRate) || 0,
+              }))
+            : undefined,
       };
 
-      console.log("PAYLOAD →", JSON.stringify(payload, null, 2));
+      console.log("LOCAL PAYLOAD →", JSON.stringify(payload, null, 2));
 
-      await createOutward(payload);
+      await createLocalOutward(payload);
 
-      alert("Global Outward entry saved successfully!");
+      alert("Local Outward entry saved successfully!");
       router.push("/dashboard/outward");
     } catch (err: any) {
       console.error("Full error:", err);
@@ -229,7 +258,9 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
     <div className="min-h-screen bg-transparent text-gray-100">
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Vehicle & Party + Coal Details */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            {/* Vehicle & Party */}
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl">
               <h2 className="text-xl font-bold flex items-center gap-3 mb-7 pb-4 border-b border-gray-700/50">
                 <Truck className="h-6 w-6 text-violet-400" />
@@ -265,6 +296,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
               </div>
             </section>
 
+            {/* Coal Details */}
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl">
               <h2 className="text-xl font-bold flex items-center gap-3 mb-7 pb-4 border-b border-gray-700/50">
                 <Package className="h-6 w-6 text-violet-400" />
@@ -347,114 +379,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
             </section>
           </div>
 
-          <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-xl">
-            <h2 className="text-xl font-bold flex items-center gap-3 mb-7 pb-4 border-b border-gray-700/50">
-              <Truck className="h-6 w-6 text-violet-400" />
-              Transporter Information
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-              <div className="relative">
-                <input
-                  type="text"
-                  name="driverName"
-                  value={formData.driverName || ""}
-                  onChange={handleChange}
-                  placeholder=" "
-                  className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.driverName ? "border-red-500" : "border-gray-700 focus:border-violet-500"
-                  } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
-                />
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                  Driver Name *
-                </label>
-                {errors.driverName && (
-                  <p className="text-red-400 text-xs mt-1.5">{errors.driverName}</p>
-                )}
-              </div>
-
-              <div className="relative">
-                <input
-                  type="tel"
-                  name="driverContact"
-                  value={formData.driverContact || ""}
-                  onChange={handleChange}
-                  placeholder=""
-                  className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.driverContact ? "border-red-500" : "border-gray-700 focus:border-violet-500"
-                  } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
-                />
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                  Driver Contact Number *
-                </label>
-                {errors.driverContact && (
-                  <p className="text-red-400 text-xs mt-1.5">{errors.driverContact}</p>
-                )}
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  name="destination"
-                  value={formData.destination || ""}
-                  onChange={handleChange}
-                  placeholder=" "
-                  className={`peer w-full px-4 py-3.5 border-b-2 ${
-                    errors.destination ? "border-red-500" : "border-gray-700 focus:border-violet-500"
-                  } rounded-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
-                />
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                  Destination *
-                </label>
-                {errors.destination && (
-                  <p className="text-red-400 text-xs mt-1.5">{errors.destination}</p>
-                )}
-              </div>
-
-              <div className="relative">
-                <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-base text-gray-300">
-                    ₹
-                  </span>
-                  <input
-                    type="text"
-                    name="transportationFee"
-                    value={formData.transportationFee || ""}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    className={`peer flex-1 px-4 py-3.5 border-b-2 ${
-                      errors.transportationFee ? "border-red-500" : "border-gray-700 focus:border-violet-500"
-                    } rounded-r-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
-                  />
-                </div>
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                  Transportation Fee (₹)
-                </label>
-              </div>
-
-              <div className="relative">
-                <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3.5 bg-gray-900/80 border-b-2 border-gray-700 rounded-l-md text-base text-gray-300">
-                    ₹
-                  </span>
-                  <input
-                    type="text"
-                    name="advanceFee"
-                    value={formData.advanceFee || ""}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    className={`peer flex-1 px-4 py-3.5 border-b-2 ${
-                      errors.advanceFee ? "border-red-500" : "border-gray-700 focus:border-violet-500"
-                    } rounded-r-md outline-none text-base text-white placeholder-transparent transition-colors duration-200`}
-                  />
-                </div>
-                <label className="absolute left-4 -top-2 px-2 bg-gray-900 text-xs font-medium text-gray-400 peer-focus:text-violet-400 transition-all duration-200">
-                  Advance Fee (₹)
-                </label>
-              </div>
-            </div>
-          </section>
-
+          {/* Weightbridge */}
           <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
             <h2 className="text-xl font-bold mb-7 flex items-center gap-3 pb-4 border-b border-gray-700/50">
               <Scale className="h-6 w-6 text-violet-400" />
@@ -513,12 +438,14 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
             </div>
           </section>
 
+          {/* Billing Section – same as global */}
           <BillingMethodSection
             formData={formData}
             setFormData={setFormData}
             handleChange={handleChange}
           />
 
+          {/* Munshiyana + Labour */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-700/50 mb-6">
@@ -645,6 +572,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
             </section>
           </div>
 
+          {/* Images */}
           <section className="bg-gray-900/70 border border-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-7 shadow-lg">
             <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-3">
               <Package className="w-6 h-6 text-indigo-400" />
@@ -691,6 +619,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
             </p>
           </section>
 
+          {/* Documents + Special Instructions */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             <section className="bg-gray-900/75 border border-gray-800/70 rounded-2xl p-6 lg:p-8 shadow-lg">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-3 pb-4 border-b border-gray-700/50">
@@ -760,6 +689,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
             </section>
           </div>
 
+          {/* Submit Buttons */}
           <div className="flex flex-col sm:flex-row justify-end gap-4 pt-10">
             <button
               type="button"
@@ -776,7 +706,7 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
               className="order-1 sm:order-2 flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="w-5 h-5" />
-              {saving || storeLoading ? "Saving..." : "Save Global Outward Entry"}
+              {saving || storeLoading ? "Saving..." : "Save Local Outward Entry"}
             </button>
           </div>
         </form>

@@ -46,8 +46,15 @@ interface InventoryState {
   loading: boolean;
   error: string | null;
 
+  // Pagination
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+
   // Actions
   fetchAllInventory: () => Promise<void>;
+  fetchInventory: () => Promise<void>;
   fetchAreaWiseSummary: () => Promise<void>;
   fetchGradeSizeSummary: () => Promise<void>;
   refreshAll: () => Promise<void>;
@@ -71,10 +78,54 @@ export const useInventoryStore = create<InventoryState>()(
       loading: false,
       error: null,
 
-      async fetchAllInventory() {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+
+      async fetchAllInventory(page = 1, limit = 10) {
         set({ loading: true, error: null });
         try {
-          const res = await axios.get(`${API_BASE_URL}/inventory`); // ← adjust your route
+          const res = await axios.get(`${API_BASE_URL}/inventory`, {
+            params: { page, limit },
+          }); // ← adjust your route
+          // or: await axios.get('/api/inventory/all') if you use getAll()
+          const data = res.data;
+
+          // Assuming response shape from your findAll() or getAll()
+          const items = Array.isArray(data) ? data : data.inventory || [];
+
+          set({
+            inventory: items,
+            totalStockMT: items.reduce(
+              (sum: number, it: InventoryItem) => sum + it.quantityMT,
+              0,
+            ),
+            activeAreasCount: new Set(items.map((it: InventoryItem) => it.area))
+              .size,
+            rejectedCoalMT: items
+              .filter((it: InventoryItem) => it.type === "REJECTED")
+              .reduce(
+                (sum: number, it: InventoryItem) => sum + it.quantityMT,
+                0,
+              ),
+            loading: false,
+            total: res.data.meta.total,
+            totalPages: res.data.meta.totalPages,
+            page,
+            limit,
+          });
+        } catch (err: any) {
+          set({
+            error: err.response?.data?.message || "Failed to load inventory",
+            loading: false,
+          });
+        }
+      },
+      async fetchInventory() {
+        set({ loading: true, error: null });
+        try {
+          const res = await axios.get(`${API_BASE_URL}/inventory/all`); // ← adjust your route
           // or: await axios.get('/api/inventory/all') if you use getAll()
           const data = res.data;
 
@@ -118,7 +169,9 @@ export const useInventoryStore = create<InventoryState>()(
       async fetchGradeSizeSummary() {
         set({ loading: true, error: null });
         try {
-          const res = await axios.get(`${API_BASE_URL}/inventory/summary/grade-size`);
+          const res = await axios.get(
+            `${API_BASE_URL}/inventory/summary/grade-size`,
+          );
           set({ gradeSizeSummaries: res.data, loading: false });
         } catch (err: any) {
           set({ error: err.message, loading: false });
