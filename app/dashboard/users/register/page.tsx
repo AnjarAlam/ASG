@@ -19,7 +19,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-type Role = "OPERATOR" | "USER" | "ADMIN" | "SUPER_ADMIN";
+type Role = "ADMIN" | "OPERATOR" | "SUPERVISOR" | "ACCOUNTS";
 
 export default function CreateUserPage() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function CreateUserPage() {
     mobileNumber: "",
     password: "",
     confirmPassword: "",
-    role: "OPERATOR" as Role,
+    role: "ADMIN" as Role,
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -286,10 +286,11 @@ export default function CreateUserPage() {
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-gray-800/60 border border-gray-700 rounded-xl text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none [&>option]:bg-gray-900 [&>option]:text-white"
                 >
-                  <option value="OPERATOR">Operator</option>
-                  <option value="USER">User</option>
                   <option value="ADMIN">Admin</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="OPERATOR">Operator</option>
+                  <option value="SUPERVISOR">Supervisor</option>
+                  <option value="ACCOUNTS">Accounts</option>
+                  
                 </select>
               </div>
             </div>

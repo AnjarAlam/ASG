@@ -3,7 +3,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-export type UserRole = "ADMIN" | "OPERATOR" | "USER" | "SUPER_ADMIN" | string
+export type UserRole = "ADMIN" | "OPERATOR" | "SUPERVISOR" | "ACCOUNTS" | string
 
 export interface AuthUser {
   _id: string;
@@ -111,7 +111,11 @@ export const useAuthStore = create<AuthState>()(
             id: organization.id,
             name: organization.name,
             email: organization.email,
-            role: organization.role
+            role: organization.role,
+            mobileNumber: organization.mobileNumber,
+            status: organization.status,
+            permissions: organization.permissions,
+            createdAt: organization.createdAt,
           }
 
           localStorage.setItem("access_token", accessToken)
