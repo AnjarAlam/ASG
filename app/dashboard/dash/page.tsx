@@ -426,7 +426,7 @@ export default function CoalDashboard() {
         </section>
 
         {/* ===== TABLE SECTION ===== */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {[
             {
               title: "Recent Inwards",

@@ -15,8 +15,8 @@ export interface LabourRecord {
   village: string;
 
   totalLabour: number;
-  checkIn: string;
-  checkOut: string;
+  // checkIn: string;
+  // checkOut: string;
 
   ratePerLabour: number;
   totalWages: number;

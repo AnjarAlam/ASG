@@ -6,10 +6,19 @@ import { persist } from "zustand/middleware"
 export type UserRole = "ADMIN" | "OPERATOR" | "USER" | "SUPER_ADMIN" | string
 
 export interface AuthUser {
-  id: string
-  name: string
-  email: string
-  role: UserRole
+  _id: string;
+  name: string;
+  email: string;
+  mobileNumber: string;
+  role: UserRole;
+  status: "active" | "inactive" | string;
+  isOnline: boolean;
+  isTyping: boolean;
+  permissions: string[];
+  createdBy?: string;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthState {
@@ -28,7 +37,7 @@ interface AuthState {
     email: string
     mobileNumber: string
     password: string
-    role?: UserRole           // optional — backend may restrict/ignore it
+    role?: UserRole           
   }) => Promise<{ success: boolean; message?: string }>
   logout: () => void
 }
@@ -42,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
-      isLoading: true,           // ← Changed: start as true to prevent early redirect
+      isLoading: true,         
       error: null,
 
       // ─── Initialize from localStorage ──────────────────────────────

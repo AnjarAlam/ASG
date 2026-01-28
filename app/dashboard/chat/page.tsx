@@ -1,356 +1,516 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react'; 
-import { ArrowLeft, MoveHorizontal } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-
-type ShapeType = 'rect';
-
-interface Area {
-  id: string;
-  label: string;
-  shape: ShapeType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  desiredWidth: number;
-  desiredHeight: number;
-}
+import { useRef, useEffect, useState } from 'react';
+import Image from 'next/image';
 
 const GRID_SIZE = 20;
-const MIN_SIZE = 60;
-const STORAGE_KEY = 'coal-washery-areas'; // unique key for localStorage
 
-export default function AreaDivisionCanvas() {
-  const router = useRouter();
+type Point = { x: number; y: number };
+
+interface InternalShape {
+  points: Point[];
+  name: string;
+  isClosed: boolean;
+}
+
+export default function ImageOutlineDrawer() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [containerSize, setContainerSize] = useState({ width: 1200, height: 800 });
 
-  // Load from localStorage or use initial data
+  // ── Outer Boundary ───────────────────────────────────────────────
+  const [boundaryPoints, setBoundaryPoints] = useState<Point[]>([]);
+  const [boundaryHistory, setBoundaryHistory] = useState<Point[][]>([]);
+  const [boundaryRedoStack, setBoundaryRedoStack] = useState<Point[][]>([]);
+  const [isBoundaryClosed, setIsBoundaryClosed] = useState(false);
+
+  // ── Multiple Internal Blocks ─────────────────────────────────────
+  const [internalShapes, setInternalShapes] = useState<InternalShape[]>([]);
+  const [currentInternalPoints, setCurrentInternalPoints] = useState<Point[]>([]);
+  const [internalHistory, setInternalHistory] = useState<Point[][]>([]);
+  const [internalRedoStack, setInternalRedoStack] = useState<Point[][]>([]);
+
+  // ── Name Modal State ─────────────────────────────────────────────
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [pendingPoints, setPendingPoints] = useState<Point[]>([]);
+  const [pendingName, setPendingName] = useState('');
+  const [isNamingBoundary, setIsNamingBoundary] = useState(false); // true = boundary, false = internal
+
+  const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
+
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const canvas = canvasRef.current;
+    if (!canvas || !containerRef.current) return;
 
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Optional: basic validation
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setAreas(parsed);
-          return;
-        }
-      } catch (e) {
-        console.error('Failed to load saved areas:', e);
-      }
-    }
+    canvas.width = containerRef.current.offsetWidth;
+    canvas.height = containerRef.current.offsetHeight;
 
-    // Fallback - initial data if nothing saved or invalid
-    const initialAreas: Area[] = [
-      { id: 'A', label: 'A', shape: 'rect', x: 0,   y: 0,   width: 240, height: 320, desiredWidth: 240, desiredHeight: 320 },
-      { id: 'B', label: 'B', shape: 'rect', x: 240, y: 0,   width: 240, height: 320, desiredWidth: 240, desiredHeight: 320 },
-      { id: 'C', label: 'C', shape: 'rect', x: 480, y: 0,   width: 220, height: 240, desiredWidth: 220, desiredHeight: 240 },
-      { id: 'D', label: 'D', shape: 'rect', x: 0,   y: 320, width: 360, height: 240, desiredWidth: 360, desiredHeight: 240 },
-      { id: 'E', label: 'E', shape: 'rect', x: 360, y: 320, width: 340, height: 240, desiredWidth: 340, desiredHeight: 240 },
-      { id: 'F', label: 'F', shape: 'rect', x: 700, y: 0,   width: 300, height: 560, desiredWidth: 300, desiredHeight: 560 },
-      { id: 'G', label: 'G', shape: 'rect', x: 0,   y: 560, width: 1000, height: 140, desiredWidth: 1000, desiredHeight: 140 },
-    ];
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-    const snapped = initialAreas.map(area => ({
-      ...area,
-      x: Math.round(area.x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(area.y / GRID_SIZE) * GRID_SIZE,
-      width: Math.round(area.width / GRID_SIZE) * GRID_SIZE,
-      height: Math.round(area.height / GRID_SIZE) * GRID_SIZE,
-    }));
+    context.lineWidth = 2.5;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    setCtx(context);
 
-    setAreas(snapped);
-  }, []);
-
-  // Save to localStorage whenever areas change
-  useEffect(() => {
-    if (areas.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(areas));
-    }
-  }, [areas]);
-
-  // Rest of your container size handling...
-  useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
+    // Handle resize
+    const handleResize = () => {
+      canvas.width = containerRef.current!.offsetWidth;
+      canvas.height = containerRef.current!.offsetHeight;
+      redraw();
     };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const snap = (v: number) => Math.round(Math.max(0, v) / GRID_SIZE) * GRID_SIZE;
-  const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(val, max));
-
-  const rectsOverlap = (a: Area, b: Area) => {
-    return !(
-      a.x + a.width <= b.x ||
-      b.x + b.width <= a.x ||
-      a.y + a.height <= b.y ||
-      b.y + b.height <= a.y
-    );
+  const isPointInsidePolygon = (point: Point, polygon: Point[]): boolean => {
+    if (polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      const intersect = ((yi > point.y) !== (yj > point.y))
+        && (point.x < (xj - xi) * (point.y - yi) / (yj - yi + 1e-10) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
   };
 
-  const wouldOverlap = (proposed: Area, allAreas: Area[], excludeId: string) => {
-    return allAreas.some(area => area.id !== excludeId && rectsOverlap(proposed, area));
-  };
+  const redraw = () => {
+    if (!ctx || !canvasRef.current) return;
+    const w = canvasRef.current.width;
+    const h = canvasRef.current.height;
 
-  const scaleAreasToContainer = (areasToScale: Area[]): Area[] => {
-    if (areasToScale.length === 0) return areasToScale;
+    ctx.clearRect(0, 0, w, h);
 
-    const maxX = Math.max(...areasToScale.map(a => a.x + a.width));
-    const maxY = Math.max(...areasToScale.map(a => a.y + a.height));
+    // Dim outside when boundary closed
+    if (isBoundaryClosed && boundaryPoints.length >= 3) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(boundaryPoints[0].x, boundaryPoints[0].y);
+      boundaryPoints.forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.closePath();
+      ctx.clip();
 
-    if (maxX <= 0 || maxY <= 0) return areasToScale;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
 
-    const scaleX = containerSize.width / maxX;
-    const scaleY = containerSize.height / maxY;
+    // Draw boundary
+    if (boundaryPoints.length > 0) {
+      ctx.strokeStyle = '#22d3ee';
+      ctx.fillStyle = 'rgba(34, 211, 238, 0.20)';
 
-    return areasToScale.map(area => {
-      const scaled = { ...area };
-      scaled.x = snap(area.x * scaleX);
-      scaled.y = snap(area.y * scaleY);
-      scaled.width = snap(area.width * scaleX);
-      scaled.height = snap(area.height * scaleY);
-      scaled.desiredWidth = scaled.width;
-      scaled.desiredHeight = scaled.height;
-      return scaled;
-    });
-  };
+      ctx.beginPath();
+      ctx.moveTo(boundaryPoints[0].x, boundaryPoints[0].y);
+      boundaryPoints.forEach(p => ctx.lineTo(p.x, p.y));
 
-  const startResize = (
-    areaId: string,
-    handle: 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-  ) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+      if (isBoundaryClosed) {
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.stroke();
 
-    const area = areas.find(a => a.id === areaId);
-    if (!area) return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startLeft = area.x;
-    const startTop = area.y;
-    const startW = area.width;
-    const startH = area.height;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-
-      setAreas(prev => {
-        return prev.map(a => {
-          if (a.id !== areaId) return a;
-
-          const next = { ...a };
-          let proposed: Area = { ...next };
-
-          switch (handle) {
-            case 'right':
-              proposed.width = snap(clamp(startW + dx, MIN_SIZE, containerSize.width - proposed.x));
-              break;
-            case 'left':
-              const newLeftW = startW - dx;
-              const newLeft = startLeft + dx;
-              if (newLeftW >= MIN_SIZE && newLeft >= 0) {
-                proposed.x = snap(newLeft);
-                proposed.width = snap(newLeftW);
-              }
-              break;
-            case 'bottom':
-              proposed.height = snap(clamp(startH + dy, MIN_SIZE, containerSize.height - proposed.y));
-              break;
-            case 'top':
-              const newTopH = startH - dy;
-              const newTop = startTop + dy;
-              if (newTopH >= MIN_SIZE && newTop >= 0) {
-                proposed.y = snap(newTop);
-                proposed.height = snap(newTopH);
-              }
-              break;
-            case 'top-left':
-              const tlW = startW - dx;
-              const tlH = startH - dy;
-              const tlX = startLeft + dx;
-              const tlY = startTop + dy;
-              if (tlW >= MIN_SIZE && tlH >= MIN_SIZE && tlX >= 0 && tlY >= 0) {
-                proposed.x = snap(tlX);
-                proposed.y = snap(tlY);
-                proposed.width = snap(tlW);
-                proposed.height = snap(tlH);
-              }
-              break;
-            case 'top-right':
-              const trW = startW + dx;
-              const trH = startH - dy;
-              const trY = startTop + dy;
-              if (trW >= MIN_SIZE && trH >= MIN_SIZE && trY >= 0) {
-                proposed.y = snap(trY);
-                proposed.width = snap(trW);
-                proposed.height = snap(trH);
-              }
-              break;
-            case 'bottom-left':
-              const blW = startW - dx;
-              const blH = startH + dy;
-              const blX = startLeft + dx;
-              if (blW >= MIN_SIZE && blH >= MIN_SIZE && blX >= 0) {
-                proposed.x = snap(blX);
-                proposed.width = snap(blW);
-                proposed.height = snap(blH);
-              }
-              break;
-            case 'bottom-right':
-              proposed.width = snap(clamp(startW + dx, MIN_SIZE, containerSize.width - proposed.x));
-              proposed.height = snap(clamp(startH + dy, MIN_SIZE, containerSize.height - proposed.y));
-              break;
-          }
-
-          proposed.desiredWidth = proposed.width;
-          proposed.desiredHeight = proposed.height;
-
-          if (!wouldOverlap(proposed, prev, areaId)) {
-            return proposed;
-          }
-
-          return next;
-        });
+      ctx.fillStyle = '#22d3ee';
+      boundaryPoints.forEach((p, i) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px Arial';
+        ctx.fillText(String(i + 1), p.x + 12, p.y - 12);
+        ctx.fillStyle = '#22d3ee';
       });
-    };
+    }
 
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      setAreas(prev => scaleAreasToContainer(prev));
-    };
+    // Draw internal shapes
+    internalShapes.forEach((shape) => {
+      if (shape.points.length < 2) return;
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.18)';
+
+      ctx.beginPath();
+      ctx.moveTo(shape.points[0].x, shape.points[0].y);
+      shape.points.forEach(p => ctx.lineTo(p.x, p.y));
+
+      if (shape.isClosed) {
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#fbbf24';
+      shape.points.forEach((p, i) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.font = 'bold 11px Arial';
+        ctx.fillText(String(i + 1), p.x + 10, p.y - 10);
+        ctx.fillStyle = '#fbbf24';
+      });
+
+      // Name centered
+      if (shape.isClosed && shape.name) {
+        const cx = shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+        const cy = shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(shape.name, cx, cy + 6);
+        ctx.textAlign = 'left';
+      }
+    });
+
+    // Current internal block
+    if (currentInternalPoints.length > 0 && isBoundaryClosed) {
+      ctx.strokeStyle = '#fcd34d';
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(currentInternalPoints[0].x, currentInternalPoints[0].y);
+      currentInternalPoints.forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#fcd34d';
+      currentInternalPoints.forEach((p, i) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.font = 'bold 11px Arial';
+        ctx.fillText(String(i + 1), p.x + 10, p.y - 10);
+        ctx.fillStyle = '#fcd34d';
+      });
+    }
   };
 
   useEffect(() => {
-    if (areas.length > 0) {
-      setAreas(prev => scaleAreasToContainer(prev));
-    }
-  }, [containerSize]);
+    redraw();
+  }, [boundaryPoints, internalShapes, currentInternalPoints, isBoundaryClosed]);
 
-  const totalArea = containerSize.width * containerSize.height;
-  const areasWithPercent = areas.map(area => {
-    const areaPx = area.width * area.height;
-    const percent = totalArea > 0 ? ((areaPx / totalArea) * 100).toFixed(1) : '0.0';
-    return { ...area, percent };
-  });
+  const getSnappedPos = (e: React.MouseEvent): Point => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.round((e.clientX - rect.left) / GRID_SIZE) * GRID_SIZE;
+    const y = Math.round((e.clientY - rect.top) / GRID_SIZE) * GRID_SIZE;
+    return { x, y };
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+  const pos = getSnappedPos(e);
+
+  if (!isBoundaryClosed) {
+    // Phase 1: Boundary
+    if (boundaryPoints.length > 0) {
+      const first = boundaryPoints[0];
+      const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
+      if (dist < 35 && boundaryPoints.length >= 3) {
+        setIsNamingBoundary(true);
+        setPendingPoints(boundaryPoints);
+        setShowNameModal(true);
+        setPendingName('Outer Boundary');
+        return;
+      }
+    }
+
+    setBoundaryPoints((prev) => {
+      const updated = [...prev, pos];
+      setBoundaryHistory((h) => [...h, updated]);
+      setBoundaryRedoStack([]);
+      return updated;
+    });
+  } else {
+    // Phase 2: Internal blocks
+    if (!isPointInsidePolygon(pos, boundaryPoints)) return;
+
+    if (currentInternalPoints.length > 0) {
+      const first = currentInternalPoints[0];
+      const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
+      if (dist < 35 && currentInternalPoints.length >= 3) {
+        // Generate next alphabet letter (A, B, C, ...)
+        const nextLetter = String.fromCharCode(
+          65 + internalShapes.length // 65 = 'A'
+        );
+
+        setIsNamingBoundary(false);
+        setPendingPoints(currentInternalPoints);
+        setShowNameModal(true);
+        setPendingName(`AREA ${nextLetter}`);
+        return;
+      }
+    }
+
+    setCurrentInternalPoints((prev) => {
+      const updated = [...prev, pos];
+      setInternalHistory((h) => [...h, updated]);
+      setInternalRedoStack([]);
+      return updated;
+    });
+  }
+};
+
+  const handleSaveName = () => {
+    if (isNamingBoundary) {
+      // Save boundary
+      setIsBoundaryClosed(true);
+      setBoundaryHistory(prev => [...prev, [...boundaryPoints]]);
+      setBoundaryRedoStack([]);
+    } else {
+      // Save internal block
+      setInternalShapes(prev => [
+        ...prev,
+        { points: pendingPoints, name: pendingName.trim() || `Block ${prev.length + 1}`, isClosed: true }
+      ]);
+      setInternalHistory(h => [...h, pendingPoints]);
+      setInternalRedoStack([]);
+    }
+
+    setShowNameModal(false);
+    setCurrentInternalPoints([]);
+    setPendingPoints([]);
+    setPendingName('');
+  };
+
+  // ── Undo / Redo ──────────────────────────────────────────────────
+  const undoBoundary = () => {
+    if (boundaryHistory.length === 0) return;
+    const prev = boundaryHistory[boundaryHistory.length - 1];
+    setBoundaryRedoStack([boundaryPoints, ...boundaryRedoStack]);
+    setBoundaryPoints(prev);
+    setBoundaryHistory(boundaryHistory.slice(0, -1));
+  };
+
+  const redoBoundary = () => {
+    if (boundaryRedoStack.length === 0) return;
+    const next = boundaryRedoStack[0];
+    setBoundaryHistory([...boundaryHistory, boundaryPoints]);
+    setBoundaryPoints(next);
+    setBoundaryRedoStack(boundaryRedoStack.slice(1));
+  };
+
+  const undoInternal = () => {
+    if (internalHistory.length === 0) return;
+    const prev = internalHistory[internalHistory.length - 1];
+    setInternalRedoStack([currentInternalPoints, ...internalRedoStack]);
+    setCurrentInternalPoints(prev);
+    setInternalHistory(internalHistory.slice(0, -1));
+  };
+
+  const redoInternal = () => {
+    if (internalRedoStack.length === 0) return;
+    const next = internalRedoStack[0];
+    setInternalHistory([...internalHistory, currentInternalPoints]);
+    setCurrentInternalPoints(next);
+    setInternalRedoStack(internalRedoStack.slice(1));
+  };
+
+  const resetAll = () => {
+    setBoundaryPoints([]);
+    setBoundaryHistory([]);
+    setBoundaryRedoStack([]);
+    setInternalShapes([]);
+    setCurrentInternalPoints([]);
+    setInternalHistory([]);
+    setInternalRedoStack([]);
+    setIsBoundaryClosed(false);
+    setShowNameModal(false);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
-      <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6 space-y-8">
+    <div className="min-h-screen bg-gray-950 text-white p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-800/60 backdrop-blur-sm border border-gray-700 rounded-lg hover:bg-gray-700/60 transition"
-          >
-            <ArrowLeft size={18} />
-            Back
-          </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-cyan-400 tracking-tight">
+              Multi-Block Area Mapping Tool
+            </h1>
+            <p className="text-gray-400 text-lg">
+              {!isBoundaryClosed
+                ? "Phase 1: Draw outer boundary → click near first dot to close & name"
+                : "Phase 2: Create & name multiple internal blocks → click near first amber dot to close"}
+            </p>
+          </div>
 
-          <h1 className="text-2xl lg:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-            Coal Washery Area Division
-          </h1>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={resetAll}
+              className="px-6 py-3 bg-red-700/90 hover:bg-red-600 rounded-lg font-medium transition shadow-md"
+            >
+              Reset Everything
+            </button>
+
+            {isBoundaryClosed && (
+              <button
+                onClick={() => alert('Areas saved! (extend to API / download later)')}
+                className="px-6 py-3 bg-green-700/90 hover:bg-green-600 rounded-lg font-medium transition shadow-md"
+              >
+                Save All Areas
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Canvas Container */}
+        {/* Undo / Redo Controls */}
+        <div className="flex flex-wrap gap-6 mb-4">
+          <div className="flex items-center gap-4 bg-gray-800/70 px-5 py-3 rounded-xl border border-gray-700 shadow-sm">
+            <span className="text-cyan-300 font-medium">Boundary:</span>
+            <button
+              onClick={undoBoundary}
+              disabled={boundaryHistory.length === 0}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition font-medium"
+            >
+              Undo
+            </button>
+            <button
+              onClick={redoBoundary}
+              disabled={boundaryRedoStack.length === 0}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition font-medium"
+            >
+              Redo
+            </button>
+          </div>
+
+          {isBoundaryClosed && (
+            <div className="flex items-center gap-4 bg-gray-800/70 px-5 py-3 rounded-xl border border-gray-700 shadow-sm">
+              <span className="text-amber-300 font-medium">Internal Blocks:</span>
+              <button
+                onClick={undoInternal}
+                disabled={internalHistory.length === 0}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition font-medium"
+              >
+                Undo
+              </button>
+              <button
+                onClick={redoInternal}
+                disabled={internalRedoStack.length === 0}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition font-medium"
+              >
+                Redo
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Canvas */}
         <div
           ref={containerRef}
-          className="relative bg-gray-900/40 backdrop-blur-sm border border-gray-700/70 rounded-2xl overflow-hidden shadow-2xl h-[75vh] min-h-[500px]"
+          className="relative w-full aspect-[16/9] max-h-[75vh] border-2 border-gray-700 rounded-2xl overflow-hidden bg-gray-900 shadow-2xl"
         >
-          {/* Grid background */}
+          <Image
+            src="/Map.png"
+            alt="Site Map"
+            fill
+            priority
+            className="object-contain opacity-45 pointer-events-none select-none"
+          />
+
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none opacity-40"
             style={{
-              backgroundImage: `linear-gradient(to right, rgba(99,102,241,0.08) 1px, transparent 1px),
-                               linear-gradient(to bottom, rgba(99,102,241,0.08) 1px, transparent 1px)`,
+              backgroundImage: `
+                linear-gradient(to right, rgba(99,102,241,0.09) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(99,102,241,0.09) 1px, transparent 1px)
+              `,
               backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
             }}
           />
 
-          {/* Areas */}
-          {areas.map(area => (
-            <div
-              key={area.id}
-              className="absolute bg-gradient-to-br from-indigo-900/40 to-purple-900/30 border border-indigo-500/50 rounded-lg shadow-lg flex items-center justify-center text-4xl md:text-5xl font-bold text-white backdrop-blur-sm transition-all duration-200 hover:border-indigo-400 hover:shadow-indigo-500/20"
-              style={{
-                left: `${area.x}px`,
-                top: `${area.y}px`,
-                width: `${area.width}px`,
-                height: `${area.height}px`,
-              }}
-            >
-              {area.label}
-
-              {/* Resize handles */}
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-gray-800/80 hover:bg-indigo-600/90 cursor-col-resize z-20 rounded-r" onMouseDown={startResize(area.id, 'left')} />
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-gray-800/80 hover:bg-indigo-600/90 cursor-col-resize z-20 rounded-l" onMouseDown={startResize(area.id, 'right')} />
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-6 bg-gray-800/80 hover:bg-indigo-600/90 cursor-row-resize z-20 rounded-b" onMouseDown={startResize(area.id, 'top')} />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-6 bg-gray-800/80 hover:bg-indigo-600/90 cursor-row-resize z-20 rounded-t" onMouseDown={startResize(area.id, 'bottom')} />
-              <div className="absolute top-0 left-0 w-8 h-8 bg-gray-800/80 hover:bg-indigo-600/90 cursor-nwse-resize z-20 rounded-br" onMouseDown={startResize(area.id, 'top-left')} />
-              <div className="absolute top-0 right-0 w-8 h-8 bg-gray-800/80 hover:bg-indigo-600/90 cursor-nesw-resize z-20 rounded-bl" onMouseDown={startResize(area.id, 'top-right')} />
-              <div className="absolute bottom-0 left-0 w-8 h-8 bg-gray-800/80 hover:bg-indigo-600/90 cursor-nesw-resize z-20 rounded-tr" onMouseDown={startResize(area.id, 'bottom-left')} />
-              <div className="absolute bottom-0 right-0 w-8 h-8 bg-gray-800/80 hover:bg-indigo-600/90 cursor-nwse-resize z-20 rounded-tl" onMouseDown={startResize(area.id, 'bottom-right')} />
-            </div>
-          ))}
+          <canvas
+            ref={canvasRef}
+            className={`absolute inset-0 ${!isBoundaryClosed ? 'cursor-crosshair' : 'cursor-cell'}`}
+            onClick={handleClick}
+          />
         </div>
 
-        {/* Area Distribution Table */}
-        <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-700/70 rounded-2xl p-6">
-          <h2 className="text-xl lg:text-2xl font-bold mb-6 text-indigo-300 flex items-center gap-3">
-            <MoveHorizontal className="w-6 h-6" />
-            Area Distribution
-          </h2>
+        {/* Status Cards */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+          <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-6 shadow-inner">
+            <p className="text-cyan-300 font-semibold text-lg mb-3">Outer Boundary</p>
+            <p className="text-gray-300 text-base">{boundaryPoints.length} points</p>
+            {isBoundaryClosed && (
+              <p className="text-green-400 mt-3 font-medium">✓ Closed & Protected</p>
+            )}
+          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-700 text-gray-300">
-                  <th className="py-4 text-left pl-4">ID</th>
-                  <th className="py-4 text-left">Label</th>
-                  <th className="py-4 text-right pr-8">Width (px)</th>
-                  <th className="py-4 text-right pr-8">Height (px)</th>
-                  <th className="py-4 text-right pr-8">Area (px²)</th>
-                  <th className="py-4 text-right pr-8">% of Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {areasWithPercent.map(area => (
-                  <tr key={area.id} className="border-b border-gray-800 hover:bg-gray-800/40 transition">
-                    <td className="py-4 pl-4 font-medium text-indigo-300">{area.id}</td>
-                    <td className="py-4">{area.label}</td>
-                    <td className="py-4 text-right pr-8">{area.width}</td>
-                    <td className="py-4 text-right pr-8">{area.height}</td>
-                    <td className="py-4 text-right pr-8 font-mono">{(area.width * area.height).toLocaleString()}</td>
-                    <td className="py-4 text-right pr-8 font-bold text-cyan-400">{area.percent}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-6 shadow-inner">
+            <p className="text-amber-300 font-semibold text-lg mb-3">Internal Blocks</p>
+            <p className="text-gray-300 text-base">{internalShapes.length} blocks created</p>
+            {currentInternalPoints.length > 0 && (
+              <p className="text-yellow-400 mt-3">
+                Current block: {currentInternalPoints.length} points
+              </p>
+            )}
+          </div>
+
+          <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-6 shadow-inner">
+            <p className="text-gray-300 font-semibold text-lg mb-3">Quick Guide</p>
+            <ul className="text-gray-400 text-sm space-y-2 list-disc pl-5">
+              <li>Click to place points (exact grid snap)</li>
+              <li>Click near first dot → close shape & name it</li>
+              <li>After boundary → create multiple named internal blocks</li>
+              <li>Use Undo/Redo anytime</li>
+            </ul>
           </div>
         </div>
-
-        <div className="text-center text-sm text-gray-500 mt-8">
-          • Areas snap to {GRID_SIZE}px grid • Minimum size: {MIN_SIZE}px • Cannot overlap
-        </div>
       </div>
+
+      {/* Name Modal (Top Center Popup) */}
+      {showNameModal && (
+        <>
+          {/* Backdrop blur */}
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+
+          {/* Modal at top center */}
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+            <div className="bg-gray-900/95 border border-cyan-500/30 rounded-2xl shadow-2xl p-6 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-xl font-bold text-cyan-300">
+                  {isNamingBoundary ? 'Name Outer Boundary' : 'Name This Block'}
+                </h3>
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={pendingName}
+                onChange={(e) => setPendingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                }}
+                placeholder="e.g. Main Area / Plot A / Zone 1"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition"
+                autoFocus
+              />
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleSaveName}
+                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition shadow-md"
+                >
+                  Save & Continue
+                </button>
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
-} 
+}

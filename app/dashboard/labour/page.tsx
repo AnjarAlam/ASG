@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   HardHat,
@@ -15,10 +15,11 @@ import {
   Truck,
   Layers,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { useLabourStore } from "@/store/labour-store";
-
 
 interface AgentAttendance {
   id: string;
@@ -30,7 +31,6 @@ interface AgentAttendance {
   Date: string;
   Contact: string;
 }
-
 
 function ViewLabourDetail({
   record,
@@ -99,7 +99,6 @@ function ViewLabourDetail({
   );
 }
 
-
 export default function LabourDashboard() {
   const router = useRouter();
   const { records, loading, error, fetchRecords } = useLabourStore();
@@ -107,8 +106,12 @@ export default function LabourDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<AgentAttendance | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
-    fetchRecords({ page: 1, limit: 20 });
+    fetchRecords({ page: 1, limit: Number.MAX_SAFE_INTEGER }); // Fetch enough records
   }, [fetchRecords]);
 
   // Today's date filter
@@ -127,7 +130,7 @@ export default function LabourDashboard() {
     totalGroups: todayRecords.length,
   };
 
-  // Table data
+  // Map records to table-friendly format
   const attendance: AgentAttendance[] = records.map((r) => {
     const createdAt = new Date(r.createdAt);
 
@@ -147,14 +150,31 @@ export default function LabourDashboard() {
     };
   });
 
-  const filteredData = attendance.filter((r) =>
-    searchTerm.trim() === ""
-      ? true
-      : r.Agentname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.village.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtered data (search)
+  const filteredData = useMemo(() => {
+    return attendance.filter((r) =>
+      searchTerm.trim() === ""
+        ? true
+        : r.Agentname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.village.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [attendance, searchTerm]);
 
+  // Pagination logic
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredData, currentPage]);
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   if (error) {
     return (
@@ -168,7 +188,7 @@ export default function LabourDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-gray-100 p-6">
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
         <div className="flex items-center gap-4">
@@ -217,13 +237,30 @@ export default function LabourDashboard() {
         />
       </section>
 
-      {/* Table */}
+      {/* Search & Table Section */}
       <section className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Clock className="text-indigo-400" />
-          Labour Records
-        </h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Clock className="text-indigo-400" />
+            Labour Records
+          </h2>
 
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search by agent, village or ID..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to page 1 on search
+              }}
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="text-gray-400 bg-gray-800/50">
@@ -239,30 +276,91 @@ export default function LabourDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {filteredData.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-800/40">
-                  <td className="p-4 font-mono">{r.id.slice(-8)}</td>
-                  <td className="p-4">{r.Agentname}</td>
-                  <td className="p-4 text-center">{r.Totallabour}</td>
-                  <td className="p-4 text-center">₹{r.Rate}</td>
-                  <td className="p-4 text-center text-violet-400">
-                    ₹{r.TotalWages.toLocaleString("en-IN")}
-                  </td>
-                  <td className="p-4 text-center">{r.Date}</td>
-                  <td className="p-4 text-center">{r.Contact}</td>
-                  <td className="p-4 text-center">
-                    <button
-                      onClick={() => setSelectedRecord(r)}
-                      className="text-indigo-400 hover:text-indigo-300 transition"
-                    >
-                      <Eye size={18} />
-                    </button>
+              {paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-gray-500">
+                    No records found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginatedData.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-800/40">
+                    <td className="p-4 font-mono">{r.id.slice(-8)}</td>
+                    <td className="p-4">{r.Agentname}</td>
+                    <td className="p-4 text-center">{r.Totallabour}</td>
+                    <td className="p-4 text-center">₹{r.Rate}</td>
+                    <td className="p-4 text-center text-violet-400">
+                      ₹{r.TotalWages.toLocaleString("en-IN")}
+                    </td>
+                    <td className="p-4 text-center">{r.Date}</td>
+                    <td className="p-4 text-center">{r.Contact}</td>
+                    <td className="p-4 text-center">
+                      <button
+                        onClick={() => setSelectedRecord(r)}
+                        className="text-indigo-400 hover:text-indigo-300 transition"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination - only show if more than 10 items */}
+        {totalItems > itemsPerPage && (
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
+            <div>
+              Showing {(currentPage - 1) * itemsPerPage + 1}–
+              {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (page) =>
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 2 && page <= currentPage + 2)
+                )
+                .map((page, idx, arr) => (
+                  <div key={page} className="flex items-center">
+                    {idx > 0 && arr[idx - 1] !== page - 1 && (
+                      <span className="px-2 text-gray-500">...</span>
+                    )}
+                    <button
+                      onClick={() => goToPage(page)}
+                      className={`w-8 h-8 rounded-lg font-medium ${
+                        currentPage === page
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  </div>
+                ))}
+
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* View Modal */}
@@ -275,7 +373,6 @@ export default function LabourDashboard() {
     </div>
   );
 }
-
 
 function Stat({
   label,
