@@ -157,7 +157,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
+        <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto scrollbar-hide hide-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);

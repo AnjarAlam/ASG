@@ -44,10 +44,8 @@ export default function SettingsPage() {
   }
 
   const handleLogout = () => {
-    if (confirm("Are you sure you want to logout?")) {
       logout();
       router.push("/login");
-    }
   };
 
   const handleSave = async () => {
