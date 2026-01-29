@@ -18,6 +18,7 @@ import {
   ChevronRight,
   HardHat,
   Wallet,
+  Map,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -59,7 +60,7 @@ export default function Sidebar() {
         { name: "Labour Management", icon: HardHat, path: "/dashboard/labour" },
         { name: "DO Report", icon: Wallet, path: "/dashboard/DOsection" },
         { name: "Reports", icon: BarChart3, path: "/dashboard/reports" },
-        { name: "Chat", icon: MessageSquare, path: "/dashboard/chat" },
+        { name: "Map", icon: Map, path: "/dashboard/map" },
         { name: "Users", icon: Users, path: "/dashboard/users" },
         { name: "Settings", icon: Settings, path: "/dashboard/settings" },
 
