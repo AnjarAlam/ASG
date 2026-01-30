@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Layers,
   Building2,
@@ -12,6 +12,9 @@ import {
   PackageCheck,
   Gauge,
   Home,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -28,12 +31,13 @@ import {
   Legend,
 } from "recharts";
 
-import { useInventoryStore } from "@/store/inventory-store"; // adjust path
+import { useInventoryStore } from "@/store/inventory-store";
 import { useInwardStore } from "@/store/inward-store";
-import dayjs from "dayjs";
 import { useOutwardStore } from "@/store/outward-store";
+import dayjs from "dayjs";
 
 const COLORS = ["#6366f1", "#a855f7", "#c084fc", "#f472b6", "#fb923c"];
+const ITEMS_PER_PAGE = 10;
 
 export default function InventoryDashboard() {
   const {
@@ -47,55 +51,56 @@ export default function InventoryDashboard() {
     fetchAllInventory,
     fetchInventory,
     fetchAreaWiseSummary,
-    // fetchGradeSizeSummary,
   } = useInventoryStore();
+
   const { outwards, fetchOutwards } = useOutwardStore();
   const { inwards, fetchInwards } = useInwardStore();
 
-  // Load data on mount
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     fetchAllInventory(1, Number.MAX_SAFE_INTEGER);
     fetchInventory();
     fetchAreaWiseSummary();
     fetchInwards(1, Number.MAX_SAFE_INTEGER);
     fetchOutwards(1, Number.MAX_SAFE_INTEGER);
-    // fetchGradeSizeSummary(); // if needed
-  }, [fetchAllInventory, fetchInventory, fetchAreaWiseSummary, fetchInwards, fetchOutwards]);
-  // console.log("inventory", inventory);
+  }, [
+    fetchAllInventory,
+    fetchInventory,
+    fetchAreaWiseSummary,
+    fetchInwards,
+    fetchOutwards,
+  ]);
 
   const today = dayjs().format("YYYY-MM-DD");
 
   const todayInwards = useMemo(
     () =>
       inwards.filter(
-        (i) =>
-          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+        (i) => dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
       ),
     [inwards],
   );
+
   const todayOutwards = useMemo(
     () =>
       outwards.filter(
-        (i) =>
-          dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
+        (i) => dayjs(i.createdAt).format("YYYY-MM-DD") === today && !i.isDeleted,
       ),
     [outwards],
   );
 
-  // Prepare chart data
   const areaStock = areaSummaries.map((s) => ({
     area: s._id,
     qty: Math.round(s.totalQuantity),
   }));
-  // console.log("area", areaStock);
 
-  // For grade distribution – computed from inventory (or use gradeSizeSummaries)
   const gradeDistribution = [
     { name: "Grade E", value: 0 },
     { name: "Grade F", value: 0 },
     { name: "Grade B", value: 0 },
   ];
-  // console.log("grade", gradeDistribution);
 
   inventory.forEach((item) => {
     if (item.grade === "E") gradeDistribution[0].value += item.quantityMT;
@@ -103,13 +108,57 @@ export default function InventoryDashboard() {
     if (item.grade === "B") gradeDistribution[2].value += item.quantityMT;
   });
 
-  // Format numbers nicely
   const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
+
+  // ── Pagination Logic (same as DOReportList) ────────────────────────
+  const totalItems = inventory.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+
+  const paginatedInventory = useMemo(
+    () => inventory.slice(startIndex, endIndex),
+    [inventory, currentPage],
+  );
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Generate visible page numbers with ellipsis
+  const pageNumbers = useMemo(() => {
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+
+      if (currentPage > 4) pages.push("...");
+
+      const start = Math.max(2, currentPage - 2);
+      const end = Math.min(totalPages - 1, currentPage + 2);
+
+      for (let i = start; i <= end; i++) pages.push(i);
+
+      if (currentPage < totalPages - 3) pages.push("...");
+
+      if (totalPages > 1) pages.push(totalPages);
+    }
+
+    return pages;
+  }, [currentPage, totalPages]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        <div className="text-xl">Loading inventory...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading inventory...</p>
+        </div>
       </div>
     );
   }
@@ -131,9 +180,7 @@ export default function InventoryDashboard() {
             <Home className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold">
-              Inventory Overview
-            </h1>
+            <h1 className="text-2xl lg:text-3xl font-bold">Inventory Overview</h1>
             <p className="text-sm text-gray-400 mt-1">
               Live stock • areas • grades • distribution
             </p>
@@ -144,32 +191,16 @@ export default function InventoryDashboard() {
         <section>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {[
-              {
-                label: "Total Stock",
-                value: formatMT(totalStockMT),
-                icon: Warehouse,
-              },
-              {
-                label: "Active Areas",
-                value: activeAreasCount.toString(),
-                icon: Building2,
-              },
-              // {
-              //   label: "Rejected Coal",
-              //   value: formatMT(rejectedCoalMT),
-              //   icon: AlertTriangle,
-              // },
+              { label: "Total Stock", value: formatMT(totalStockMT), icon: Warehouse },
+              { label: "Active Areas", value: activeAreasCount.toString(), icon: Building2 },
               {
                 label: "Inward Movements",
                 value: todayInwards.length,
                 icon: (props: any) => (
-                  <Truck
-                    {...props}
-                    className="scale-x-[-1.05] text-indigo-400 scale-y-125"
-                  />
+                  <Truck {...props} className="scale-x-[-1.05] text-indigo-400 scale-y-125" />
                 ),
-              }, // ← placeholder – add real data later
-              { label: "OutWard Movements", value: todayOutwards.length, icon: Truck }, // ← placeholder – add real data later
+              },
+              { label: "Outward Movements", value: todayOutwards.length, icon: Truck },
               {
                 label: "Avg Stock / Area",
                 value:
@@ -178,7 +209,6 @@ export default function InventoryDashboard() {
                     : "0 MT",
                 icon: Gauge,
               },
-              // { label: "Turnover Rate", value: "78%", icon: PackageCheck }, // ← placeholder
             ].map((k) => (
               <div
                 key={k.label}
@@ -238,75 +268,135 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* TABLE – now using real data */}
+        {/* INVENTORY TABLE WITH PAGINATION */}
         <section className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 hover:border-indigo-500/40 transition-all">
-          <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <FileText className="text-indigo-400" />
-            Current Inventory Details
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FileText className="text-indigo-400" />
+              Current Inventory Details
+            </h3>
+            <div className="text-sm text-gray-400">
+              Showing {startIndex + 1}–{endIndex} of {totalItems}
+            </div>
+          </div>
 
           {/* Mobile Cards */}
           <div className="sm:hidden space-y-4">
-            {inventory.map((row) => (
-              <div
-                key={row._id}
-                className="bg-gray-900/60 border border-gray-800 rounded-xl p-4"
-              >
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-gray-400">Area</p>
-                    {row.area}
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Grade</p>
-                    {row.grade}
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Type</p>
-                    {row.type}
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Size</p>
-                    {row.size} mm
-                  </div>
-                  <div className="col-span-2 font-semibold text-indigo-300">
-                    {row.quantityMT.toLocaleString()} MT
+            {paginatedInventory.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No inventory records found</p>
+            ) : (
+              paginatedInventory.map((row) => (
+                <div
+                  key={row._id}
+                  className="bg-gray-900/60 border border-gray-800 rounded-xl p-4"
+                >
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-400">Area</p>
+                      {row.area}
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Grade</p>
+                      {row.grade}
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Type</p>
+                      {row.type}
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Size</p>
+                      {row.size} mm
+                    </div>
+                    <div className="col-span-2 font-semibold text-indigo-300">
+                      {row.quantityMT.toLocaleString()} MT
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Desktop Table */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead className="text-gray-400 border-b border-gray-700">
-                <tr>
-                  <th className="py-3 text-left px-2">Area</th>
-                  <th className="py-3 text-center px-2">Grade</th>
-                  <th className="py-3 text-center px-2">Type</th>
-                  <th className="py-3 text-center px-2">Size (mm)</th>
-                  <th className="py-3 text-right px-2">Quantity (MT)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventory.map((row) => (
-                  <tr
-                    key={row._id}
-                    className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
-                  >
-                    <td className="py-3 px-2">{row.area}</td>
-                    <td className="py-3 px-2 text-center">{row.grade}</td>
-                    <td className="py-3 px-2 text-center">{row.type}</td>
-                    <td className="py-3 px-2 text-center">{row.size}</td>
-                    <td className="py-3 px-2 text-right font-semibold text-indigo-300">
-                      {row.quantityMT.toLocaleString()}
-                    </td>
+            {paginatedInventory.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No inventory records found</p>
+            ) : (
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="text-gray-400 border-b border-gray-700">
+                  <tr>
+                    <th className="py-3 text-left px-2">Area</th>
+                    <th className="py-3 text-center px-2">Grade</th>
+                    <th className="py-3 text-center px-2">Type</th>
+                    <th className="py-3 text-center px-2">Size (mm)</th>
+                    <th className="py-3 text-right px-2">Quantity (MT)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedInventory.map((row) => (
+                    <tr
+                      key={row._id}
+                      className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
+                    >
+                      <td className="py-3 px-2">{row.area}</td>
+                      <td className="py-3 px-2 text-center">{row.grade}</td>
+                      <td className="py-3 px-2 text-center">{row.type}</td>
+                      <td className="py-3 px-2 text-center">{row.size}</td>
+                      <td className="py-3 px-2 text-right font-semibold text-indigo-300">
+                        {row.quantityMT.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
+
+          {/* Pagination Controls – same style as DOReportList */}
+          {totalItems > ITEMS_PER_PAGE && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+              <div className="text-gray-400">
+                Showing {startIndex + 1}–{endIndex} of {totalItems}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+
+                {pageNumbers.map((page, idx) =>
+                  page === "..." ? (
+                    <span key={idx} className="px-2 text-gray-500">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page as number)}
+                      className={`w-8 h-8 rounded-lg font-medium ${
+                        currentPage === page
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

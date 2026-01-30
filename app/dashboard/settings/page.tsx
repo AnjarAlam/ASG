@@ -24,6 +24,7 @@ import dayjs from "dayjs";
 export default function SettingsPage() {
   const { user, isAuthenticated, logout, isLoading } = useAuthStore();
   const router = useRouter();
+  
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: "", mobileNumber: "" });
@@ -38,10 +39,11 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  if (!isAuthenticated && !isLoading) {
-    router.replace("/login");
-    return null;
-  }
+   useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogout = () => {
       logout();

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import BillingMethodSection from "./ASGbillingMethod"; // same component as global
+import BillingMethodSection from "./ASGbillingMethod";
 import {
   Save,
   X,
@@ -13,7 +13,7 @@ import {
   Upload,
   Trash2,
 } from "lucide-react";
-import { useOutwardLocalStore } from "../../store/outward-local-store"; // ← your local store
+import { useOutwardLocalStore } from "../../store/outward-local-store"; 
 
 interface LocalOutwardFormProps {
   outwardToken: string;
@@ -105,6 +105,7 @@ export default function LocalOutwardForm({ outwardToken }: LocalOutwardFormProps
         (newData as any)[name] = value;
       }
 
+    
       // Auto-calculate net weight
       if (name === "grossWeight" || name === "tareWeight") {
         const gross = Number(newData.grossWeight) || 0;
@@ -180,60 +181,58 @@ export default function LocalOutwardForm({ outwardToken }: LocalOutwardFormProps
 
     try {
       const payload = {
-        tokenNumber: formData.tokenNumber || outwardToken || "AUTO",
-        vehicleNumber: formData.vehicleNumber.trim() || "UNKNOWN",
-        customerName: formData.partyName.trim() || "Unknown Party",
-        vehicleSize: formData.munshiyanaSize === "large" ? "LARGE" : "SMALL",
-        munshiana: formData.munshiyanaPrice || "0",
-        note: (formData.munshiyanaRemarks || formData.labourRemarks || "No remarks").trim(),
-        coalGrade: formData.grade || "E",
-        coalType: formData.material || "ROM",
-        coalSize: formData.size || "0-10",
-        area: formData.area || "",
-        grossWeight: Number(formData.grossWeight) || 0,
-        tareWeight: Number(formData.tareWeight) || 0,
-        dispatchDateTime: new Date().toISOString(),
-        gst: formData.gstRate || "18",
-        billingRate: formData.billingRate || "0",
-        actualRate: formData.actualRate || "0",
-        tcsRate: "1", // or get from form if you add field
-        labourIds: formData.labourId.trim() ? [formData.labourId.trim()] : [],
-        instructions: formData.specialInstructions?.trim()
-          ? [formData.specialInstructions.trim()]
-          : [],
+  tokenNumber: formData.tokenNumber || outwardToken || "AUTO",
+  vehicleNumber: formData.vehicleNumber.trim() || "UNKNOWN",
+  customerName: formData.partyName.trim() || "Unknown Party",
+  vehicleSize: formData.munshiyanaSize === "large" ? "LARGE" : "SMALL",
+  munshiana: Number(formData.munshiyanaPrice) || 0,               // ← convert to number
+  note: (formData.munshiyanaRemarks || formData.labourRemarks || "").trim(),
+  coalGrade: formData.grade || "E",
+  coalType: formData.material || "ROM",
+  coalSize: formData.size || "0-10",
+  area: formData.area || "",
+  grossWeight: Number(formData.grossWeight) || 0,
+  tareWeight: Number(formData.tareWeight) || 0,
+  dispatchDateTime: new Date().toISOString(),
+  gst: formData.gstRate || "18",
+  billingRate: formData.billingRate || "0",
+  actualRate: formData.actualRate || "0",
+  tcsRate: "1",
+  labourIds: formData.labourId.trim() ? [formData.labourId.trim()] : [],
+  instructions: formData.specialInstructions?.trim()
+    ? [formData.specialInstructions.trim()]
+    : [],
 
-        images: formData.images.length > 0 ? formData.images.map((f) => f.name) : [],
-        documents: formData.documents.length > 0 ? formData.documents.map((f) => f.name) : [],
+  // Only send if actually selected
+  halfBilling: formData.billingMethods.includes("half") && formData.half
+    ? {
+        cashAmount: Number(formData.half.cashAmount) || 0,
+        billingTotalAmount: Number(formData.half.billingWithGst) || 0,
+        tax: (Number(formData.half.gstAmount) + Number(formData.half.tcsAmount)) || 0,
+      }
+    : null,   // ← send null instead of undefined
 
-        // Billing sub-documents – using same structure as global
-        halfBilling:
-          formData.billingMethods.includes("half") && formData.half
-            ? {
-                cashAmount: Number(formData.half.cashAmount) || 0,
-                billingTotalAmount: Number(formData.half.billingWithGst) || 0,
-                tax: (Number(formData.half.gstAmount) + Number(formData.half.tcsAmount)) || 0,
-              }
-            : undefined,
+  halfWeightBilling: formData.billingMethods.includes("weight") && formData.weight
+    ? {
+        cashAmount: Number(formData.weight.cashAmount) || 0,
+        billingTotalAmount: Number(formData.weight.billingWithGst) || 0,
+        tax: (Number(formData.weight.gstAmount) + Number(formData.weight.tcsAmount)) || 0,
+      }
+    : null,
 
-        halfWeightBilling:
-          formData.billingMethods.includes("weight") && formData.weight
-            ? {
-                cashAmount: Number(formData.weight.cashAmount) || 0,
-                billingTotalAmount: Number(formData.weight.billingWithGst) || 0,
-                tax: (Number(formData.weight.gstAmount) + Number(formData.weight.tcsAmount)) || 0,
-              }
-            : undefined,
+  differentMaterial: formData.billingMethods.includes("different") && formData.different
+    ? formData.different.materials.map((m) => ({
+        name: m.name || "",
+        quantity: Number(m.quantity) || 0,
+        billingRate: Number(m.billingRate) || 0,
+        actualRate: Number(m.actualRate) || 0,
+      }))
+    : null,
 
-        differentMaterial:
-          formData.billingMethods.includes("different") && formData.different
-            ? formData.different.materials.map((m: any) => ({
-                name: m.name || "",
-                quantity: Number(m.quantity) || 0,
-                billingRate: Number(m.billingRate) || 0,
-                actualRate: Number(m.actualRate) || 0,
-              }))
-            : undefined,
-      };
+  // Images & documents – only names (if backend expects that)
+  images: formData.images.length > 0 ? formData.images.map((f) => f.name) : [],
+  documents: formData.documents.length > 0 ? formData.documents.map((f) => f.name) : [],
+};
 
       console.log("LOCAL PAYLOAD →", JSON.stringify(payload, null, 2));
 
@@ -313,10 +312,10 @@ export default function LocalOutwardForm({ outwardToken }: LocalOutwardFormProps
                       let material = "ROM";
                       if (value === "F") {
                         grade = "F";
-                        material = "Steam";
+                        material = "STEAM";
                       } else if (value === "B") {
                         grade = "B";
-                        material = "Boulders";
+                        material = "BOULDERS";
                       }
                       setFormData((prev) => ({
                         ...prev,

@@ -30,7 +30,7 @@ interface AuthState {
   error: string | null
 
   // ─── Core actions ────────────────────────────────────────────────
-  initializeAuth: () => void
+ initializeAuth: () => void
   login: (email: string, password: string) => Promise<boolean>
   signup: (data: {
     name: string
@@ -39,8 +39,16 @@ interface AuthState {
     password: string
     role?: UserRole           
   }) => Promise<{ success: boolean; message?: string }>
+  createUser: (data: {          
+    name: string
+    email: string
+    password: string
+    role: UserRole
+    mobileNumber: string
+  }) => Promise<{ success: boolean; message?: string }>
   logout: () => void
 }
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -188,6 +196,55 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, message: msg }
         }
       },
+
+      createUser: async ({ name, email, password, role, mobileNumber }) => {
+        set({ isLoading: true, error: null })
+
+        const token = get().accessToken
+        if (!token) {
+          set({ isLoading: false, error: "Unauthorized. Please login again." })
+          return { success: false, message: "No access token found" }
+        }
+
+        try {
+          const payload = {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            mobileNumber: mobileNumber.trim(),
+            password,
+            role,
+          }
+
+          const res = await fetch(`${API_BASE}/user-auth/create`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          })
+
+          const data = await res.json()
+
+          if (!res.ok) {
+            throw new Error(data?.message || data?.error || "Failed to create user")
+          }
+
+          set({ isLoading: false, error: null })
+
+          return {
+            success: true,
+            message: data?.message || "User created successfully",
+          }
+        } catch (err: any) {
+          const msg = err.message || "User creation failed"
+          set({ error: msg, isLoading: false })
+          return { success: false, message: msg }
+        }
+      },
+
+
+    
 
       // ─── Logout ─────────────────────────────────────────────────────
       logout: () => {

@@ -340,8 +340,8 @@ export default function LocalInwardForm({ inwardToken }: LocalInwardFormProps) {
                     onChange={(e) => {
                       const val = e.target.value;
                       let type = "ROM";
-                      if (val === "F") type = "Steam";
-                      if (val === "B") type = "Boulders";
+                      if (val === "F") type = "STEAM";
+                      if (val === "B") type = "BOULDERS";
                       setFormData((p) => ({ ...p, coalGrade: val, coalType: type }));
                     }}
                     className="w-full px-4 py-3.5 bg-gray-900/60 border-b-2 border-gray-700 focus:border-indigo-500 rounded-md outline-none text-base text-white appearance-none"

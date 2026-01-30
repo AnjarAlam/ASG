@@ -28,6 +28,7 @@ import {
   BarChart3,
   Home,
   Grid,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -35,11 +36,6 @@ import { useInwardStore } from "@/store/inward-store";
 import dayjs from "dayjs";
 import { useOutwardStore } from "@/store/outward-store";
 
-/* ================= DATA ================= */
-
-// KPIs
-
-/* ================= PAGE ================= */
 
 const COLORS = ["#6366f1", "#a855f7", "#c084fc", "#f472b6", "#fb923c"];
 
@@ -62,7 +58,6 @@ export default function CoalDashboard() {
 
   // Load data on mount
   useEffect(() => {
-    fetchAllInventory(1, Number.MAX_SAFE_INTEGER);
     fetchInventory();
     fetchAreaWiseSummary();
     fetchInwards(1, Number.MAX_SAFE_INTEGER);
@@ -166,10 +161,7 @@ export default function CoalDashboard() {
       value: stats.totalCoalOutwardToday,
       icon: Truck,
     },
-    // { label: "Rejected Coal", value: "98 MT", icon: AlertTriangle },
-    // { label: "Avg Weighment Time", value: "3.4 min", icon: Gauge },
-    // { label: "Pending Vehicles", value: "7", icon: Clock },
-    // { label: "Completed Trips", value: "124", icon: CheckCircle },
+
   ];
 
   // Coal Grades (Pie)
@@ -187,21 +179,6 @@ export default function CoalDashboard() {
 
   const GRADE_COLORS = ["#6366f1", "#a855f7", "#c084fc"];
 
-  // Monthly Coal Inward (MT)
-  // const monthlyInward = [
-  //   { month: "Jan", value: 12500 },
-  //   { month: "Feb", value: 14800 },
-  //   { month: "Mar", value: 16200 },
-  //   { month: "Apr", value: 13900 },
-  //   { month: "May", value: 17800 },
-  //   { month: "Jun", value: 15500 },
-  //   { month: "Jul", value: 19200 },
-  //   { month: "Aug", value: 16800 },
-  //   { month: "Sep", value: 18400 },
-  //   { month: "Oct", value: 15900 },
-  //   { month: "Nov", value: 14200 },
-  //   { month: "Dec", value: 15100 },
-  // ];
   const monthlyCoalMovement = useMemo(() => {
     const map: Record<string, number> = {};
 
@@ -233,16 +210,6 @@ export default function CoalDashboard() {
     }));
   }, [inwards, outwards]);
 
-  // Daily Coal Movement (MT)
-  // const dailyFlow = [
-  //   { day: "Sun", value: 4200 },
-  //   { day: "Mon", value: 5800 },
-  //   { day: "Tue", value: 5300 },
-  //   { day: "Wed", value: 7100 },
-  //   { day: "Thu", value: 7600 },
-  //   { day: "Fri", value: 6200 },
-  //   { day: "Sat", value: 6800 },
-  // ];
   const dailyCoalMovement = useMemo(() => {
     const map: Record<string, number> = {};
 
@@ -294,6 +261,17 @@ export default function CoalDashboard() {
   // console.log("in", recentInwards);
   const recentOutwards = useMemo(() => outwards.slice(0, 3), [outwards]);
   // console.log("out", recentOutwards);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">

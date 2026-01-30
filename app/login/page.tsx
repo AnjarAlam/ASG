@@ -1,31 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error: authError } = useAuthStore();
+  const { login, isLoading, error: authError, isAuthenticated, initializeAuth } = useAuthStore();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState("");
 
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/dashboard/dash");
+      return;
+    }
+
+    window.history.replaceState(null, "", window.location.href);
+
+    window.history.pushState(null, "", window.location.href);
+
+    const blockBack = (e: PopStateEvent) => {
+      window.history.pushState(null, "", "/login");
+    };
+
+    window.addEventListener("popstate", blockBack);
+
+    return () => {
+      window.removeEventListener("popstate", blockBack);
+    };
+  }, [isAuthenticated, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
 
-    const success = await login(formData.email.trim(), formData.password);
+    const success = await login(
+      formData.email.trim().toLowerCase(),
+      formData.password
+    );
 
     if (success) {
-      router.push("/dashboard/dash");
+      setFormData({ email: "", password: "" });
+      router.replace("/dashboard/dash");
     } else {
       setLocalError(authError || "Invalid email or password");
     }
   };
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black p-6">
@@ -105,7 +137,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
         </div>
       </div>
     </div>

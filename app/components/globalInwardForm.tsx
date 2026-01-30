@@ -384,11 +384,11 @@ export default function LocalInwardForm({ inwardToken }: LocalInwardFormProps) {
           let type = "ROM";
           if (val === "F") {
             grade = "F";
-            type = "Steam";
+            type = "STEAM";
           }
           if (val === "B") {
             grade = "B";
-            type = "Boulders";
+            type = "BOULDERS";
           }
           setFormData((p) => ({
             ...p,

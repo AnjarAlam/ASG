@@ -59,6 +59,7 @@ export default function Sidebar() {
         { name: "Outward", icon: ArrowUpFromLine, path: "/dashboard/outward" },
         { name: "Labour Management", icon: HardHat, path: "/dashboard/labour" },
         { name: "DO Report", icon: Wallet, path: "/dashboard/DOsection" },
+        { name: "Chat", icon: MessageSquare, path: "/dashboard/chat" },
         { name: "Reports", icon: BarChart3, path: "/dashboard/reports" },
         { name: "Map", icon: Map, path: "/dashboard/map" },
         { name: "Users", icon: Users, path: "/dashboard/users" },

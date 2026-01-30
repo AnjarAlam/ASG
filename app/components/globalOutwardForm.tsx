@@ -317,10 +317,10 @@ export default function GlobalOutwardForm({ outwardToken }: GlobalOutwardFormPro
                       let material = "ROM";
                       if (value === "F") {
                         grade = "F";
-                        material = "Steam";
+                        material = "STEAM";
                       } else if (value === "B") {
                         grade = "B";
-                        material = "Boulders";
+                        material = "BOULDERS";
                       }
                       setFormData((prev) => ({
                         ...prev,

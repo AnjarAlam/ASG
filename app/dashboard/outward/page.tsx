@@ -75,7 +75,7 @@ export default function OutwardDashboard() {
 
     return {
       totalVehiclesToday: todayOutwards.length,
-      totalCoalOutwardToday: `${totalNetOut.toFixed(2)} MT`,
+      totalCoalOutwardToday: `${(totalNetOut/10).toFixed(2)} MT`,
       averageNetWeight: todayOutwards.length
         ? formatWeight(totalNetOut / todayOutwards.length)
         : "0.00 MT",

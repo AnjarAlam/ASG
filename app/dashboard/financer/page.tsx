@@ -111,6 +111,18 @@ export default function FinanceDashboard() {
     return data;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-gray-100 pb-8">
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-8 space-y-8">

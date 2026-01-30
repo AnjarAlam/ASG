@@ -16,7 +16,7 @@ export default function RootLayout({
   }, []);
 
   return (
-    <html lang="en">
+    <html lang="en" className="hi">
       <body className="bg-gray-950 text-gray-100">
         {isAuthenticated ? (
           <div className="flex min-h-screen">

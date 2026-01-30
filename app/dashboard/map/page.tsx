@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { useMapStore } from '@/store/map-store';
+import { Loader2 } from 'lucide-react';
 
 const GRID_SIZE = 20;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -13,6 +14,7 @@ export default function MapDrawPage() {
 
   const {
     mapName,
+    loading,
     setMapName,
     boundaryPoints,
     isBoundaryClosed,
@@ -281,7 +283,18 @@ export default function MapDrawPage() {
       setIsSaving(false);
     }
   };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading Map...</p>
+        </div>
+      </div>
+    );
+  }
 
+  
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">

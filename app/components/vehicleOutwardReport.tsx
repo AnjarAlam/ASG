@@ -92,7 +92,7 @@ export default function VehicleOutwardMovements() {
         action: entry.outwardType === "GLOBAL" ? "Global Dispatch" : "Local Dispatch",
         status: entry.netWeight && Number(entry.netWeight) > 0 ? "success" : "pending",
         customer: entry.customerName || "—",
-        netWeight: entry.netWeight ? `${(Number(entry.netWeight) / 1000).toFixed(2)} MT` : "—",
+        netWeight: entry.netWeight ? `${(Number(entry.netWeight) / 10).toFixed(2)} MT` : "—",
       }));
   }, [allOutwards, dateRange]);
 

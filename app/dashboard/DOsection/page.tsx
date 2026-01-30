@@ -14,6 +14,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -195,6 +196,16 @@ export default function DODashboard() {
         <div className="text-red-500 text-xl text-center max-w-2xl">
           <p className="text-2xl mb-4">Error Loading Data</p>
           <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+        <div className="flex flex-col items-center gap-4 text-indigo-400">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading DoReport...</p>
         </div>
       </div>
     );
