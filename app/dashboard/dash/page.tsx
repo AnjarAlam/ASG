@@ -258,7 +258,6 @@ export default function CoalDashboard() {
 
   // Recent Inwards & Outwards
   const recentInwards = useMemo(() => inwards.slice(0, 3), [inwards]);
-  // console.log("in", recentInwards);
   const recentOutwards = useMemo(() => outwards.slice(0, 3), [outwards]);
   // console.log("out", recentOutwards);
 

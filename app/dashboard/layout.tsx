@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth-store";
-import Sidebar from "../components/sidebar"; // ← your sidebar component
+import Sidebar from "../components/sidebar"; 
 
 export default function RootLayout({
   children,
@@ -13,10 +13,10 @@ export default function RootLayout({
 
   useEffect(() => {
     initializeAuth();
-  }, []);
+  }, []); 
 
   return (
-    <html lang="en" className="hi">
+    <html lang="en" className="hide-scrollbar">
       <body className="bg-gray-950 text-gray-100">
         {isAuthenticated ? (
           <div className="flex min-h-screen">

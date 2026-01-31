@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { useMapStore } from '@/store/map-store';
-import { Loader2 } from 'lucide-react';
+import { MapPin, Trash2, Undo2, Save, AlertCircle } from 'lucide-react';
 
 const GRID_SIZE = 20;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -14,7 +14,6 @@ export default function MapDrawPage() {
 
   const {
     mapName,
-    loading,
     setMapName,
     boundaryPoints,
     isBoundaryClosed,
@@ -33,7 +32,7 @@ export default function MapDrawPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showNameInput, setShowNameInput] = useState(false);
   const [pendingName, setPendingName] = useState('');
-  const [undoStack, setUndoStack] = useState<any[]>([]); // simple undo (can be improved later)
+  const [undoStack, setUndoStack] = useState<Array<{ boundaryPoints: {x: number; y: number}[]; isBoundaryClosed: boolean; areas: {name: string; points: {x: number; y: number}[]; isClosed: boolean}[]; currentAreaPoints: {x: number; y: number}[] }>>([]); // simple undo (can be improved later)
 
   // Save state for undo
   const saveForUndo = useCallback(() => {
@@ -82,6 +81,7 @@ export default function MapDrawPage() {
       window.removeEventListener('orientationchange', debouncedResize);
       clearTimeout(resizeTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Set context once
@@ -173,7 +173,7 @@ export default function MapDrawPage() {
       ctx.setLineDash([]);
 
       ctx.fillStyle = '#fcd34d';
-      currentAreaPoints.forEach((p, i) => {
+      currentAreaPoints.forEach((p) => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
         ctx.fill();
@@ -276,94 +276,102 @@ export default function MapDrawPage() {
 
       const json = await res.json();
       alert(`Map saved successfully!\nID: ${json.data._id}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert('Error saving map: ' + (err.message || 'Unknown error'));
+      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      alert('Error saving map: ' + errMsg);
     } finally {
       setIsSaving(false);
     }
   };
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-black">
-        <div className="flex flex-col items-center gap-4 text-indigo-400">
-          <Loader2 className="w-12 h-12 animate-spin" />
-          <p className="text-lg">Loading Map...</p>
-        </div>
-      </div>
-    );
-  }
-
-  
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6">
+    <div className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-black text-white p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-cyan-400">Map Editor</h1>
-            <p className="text-gray-400 mt-1 text-sm sm:text-base">
-              {!isBoundaryClosed
-                ? 'Phase 1: Draw outer boundary → close near first point'
-                : 'Phase 2: Draw internal areas → close near first point of each area'}
-            </p>
-          </div>
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-linear-to-br from-cyan-500 to-blue-600 rounded-lg">
+                <MapPin className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-white">Map Editor</h1>
+                <p className="text-gray-400 mt-2 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {!isBoundaryClosed
+                    ? 'Phase 1: Draw the outer boundary'
+                    : 'Phase 2: Draw internal areas'}
+                </p>
+              </div>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={resetAll}
-              className="px-5 py-2 bg-red-700/90 hover:bg-red-600 rounded-lg transition text-sm sm:text-base"
-            >
-              Reset All
-            </button>
-
-            <button
-              onClick={handleUndo}
-              disabled={undoStack.length === 0}
-              className={`px-5 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-sm sm:text-base ${
-                undoStack.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              Undo
-            </button>
-
-            {isBoundaryClosed && (
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button
-                onClick={handleSaveMap}
-                disabled={isSaving}
-                className={`px-6 py-2 rounded-lg font-medium transition text-sm sm:text-base ${
-                  isSaving ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                title="Undo last action"
+                className={`p-2.5 sm:p-3 rounded-lg transition flex items-center gap-2 text-sm font-medium ${
+                  undoStack.length === 0
+                    ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed opacity-50'
+                    : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                 }`}
               >
-                {isSaving ? 'Saving...' : 'Save Map'}
+                <Undo2 className="w-5 h-5" />
+                <span className="hidden sm:inline">Undo</span>
               </button>
-            )}
+
+              <button
+                onClick={resetAll}
+                title="Reset all drawings"
+                className="p-2.5 sm:p-3 rounded-lg bg-red-900/80 hover:bg-red-800 transition flex items-center gap-2 text-sm font-medium text-red-100"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span className="hidden sm:inline">Reset</span>
+              </button>
+
+              {isBoundaryClosed && (
+                <button
+                  onClick={handleSaveMap}
+                  disabled={isSaving}
+                  title="Save map to database"
+                  className={`p-2.5 sm:p-3 rounded-lg transition flex items-center gap-2 text-sm font-medium ${
+                    isSaving
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
+                  }`}
+                >
+                  <Save className="w-5 h-5" />
+                  <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save Map'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Map Name */}
-        <div className="mb-5">
-          <label className="block text-gray-300 mb-2 text-sm sm:text-base">Map Name</label>
+        {/* Map Name Input */}
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-200 mb-3">Map Name</label>
           <input
             type="text"
             value={mapName}
             onChange={(e) => setMapName(e.target.value)}
-            className="w-full max-w-md sm:max-w-lg px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-500 text-sm sm:text-base"
-            placeholder="e.g. Coal Stockyard - Raipur"
+            placeholder="e.g., Coal Stockyard - Sector A"
+            className="w-full max-w-xl px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-sm transition"
           />
         </div>
 
-        {/* Canvas Container – fixed aspect ratio */}
-        <div
-          ref={containerRef}
-          className="relative w-full pb-[56.25%] max-h-[80vh] border border-gray-700 rounded-xl overflow-hidden bg-gray-900 shadow-2xl mx-auto"
-        >
-          <div className="absolute inset-0">
+        {/* Canvas Container */}
+        <div className="rounded-xl overflow-hidden border border-gray-700 shadow-2xl bg-black">
+          <div
+            ref={containerRef}
+            className="relative w-full bg-linear-to-br from-gray-900 to-gray-950"
+            style={{ aspectRatio: '16/9', minHeight: '500px', maxHeight: '70vh' }}
+          >
             <Image
               src="/Map.png"
               alt="Background map"
               fill
-              className="object-contain opacity-40 pointer-events-none select-none"
+              className="object-contain opacity-30 pointer-events-none select-none"
             />
 
             <canvas
@@ -371,43 +379,73 @@ export default function MapDrawPage() {
               className="absolute inset-0 w-full h-full touch-none cursor-crosshair"
               onPointerDown={handlePointerDown}
             />
+
+            {/* Grid Overlay Info */}
+            <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur px-3 py-2 rounded-lg border border-gray-700/50 text-xs text-gray-300">
+              Grid: {GRID_SIZE}px
+            </div>
           </div>
         </div>
 
-        {/* Name modal */}
+        {/* Info Section */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+            <p className="text-gray-400 text-sm mb-1">Boundary Points</p>
+            <p className="text-2xl font-bold text-cyan-400">{boundaryPoints.length}</p>
+          </div>
+
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+            <p className="text-gray-400 text-sm mb-1">Areas Created</p>
+            <p className="text-2xl font-bold text-amber-400">{areas.length}</p>
+          </div>
+
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+            <p className="text-gray-400 text-sm mb-1">Status</p>
+            <p className={`text-lg font-bold ${isBoundaryClosed ? 'text-green-400' : 'text-orange-400'}`}>
+              {isBoundaryClosed ? 'Boundary ✓' : 'Drawing Boundary'}
+            </p>
+          </div>
+        </div>
+
+        {/* Name Modal */}
         {showNameInput && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
-            <div className="bg-gray-900 p-6 rounded-xl border border-cyan-600/40 w-full max-w-md">
-              <h3 className="text-xl font-semibold text-cyan-300 mb-4">
-                Name {isBoundaryClosed ? 'this area' : 'the boundary'}
-              </h3>
+          <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
+            <div className="bg-gray-900 border border-cyan-600/40 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="bg-linear-to-r from-cyan-600/20 to-blue-600/20 border-b border-gray-700 px-6 py-4">
+                <h3 className="text-xl font-bold text-cyan-300">
+                  {isBoundaryClosed ? 'Name This Area' : 'Name the Boundary'}
+                </h3>
+              </div>
 
-              <input
-                type="text"
-                value={pendingName}
-                onChange={(e) => setPendingName(e.target.value)}
-                placeholder="Required"
-                autoFocus
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg mb-5 focus:outline-none focus:border-cyan-500"
-              />
+              <div className="p-6">
+                <input
+                  type="text"
+                  value={pendingName}
+                  onChange={(e) => setPendingName(e.target.value)}
+                  placeholder="Enter name..."
+                  autoFocus
+                  onKeyPress={(e) => e.key === 'Enter' && handleSaveName()}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg mb-6 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-sm transition"
+                />
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSaveName}
-                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => {
-                    setShowNameInput(false);
-                    setPendingName('');
-                    if (isBoundaryClosed) cancelCurrentArea();
-                  }}
-                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
-                >
-                  Cancel
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSaveName}
+                    className="flex-1 py-3 bg-linear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg font-semibold transition text-white"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNameInput(false);
+                      setPendingName('');
+                      if (isBoundaryClosed) cancelCurrentArea();
+                    }}
+                    className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition text-gray-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>

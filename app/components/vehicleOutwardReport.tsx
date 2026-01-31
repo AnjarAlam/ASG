@@ -147,12 +147,12 @@ export default function VehicleOutwardMovements() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          {/* <button
             onClick={setToday}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-sm transition"
           >
             Today
-          </button>
+          </button> */}
 
           <div className="flex items-center gap-2">
             <input
