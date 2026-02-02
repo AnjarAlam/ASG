@@ -112,8 +112,8 @@ export default function CoalDashboard() {
       .filter((i) => !i.isDeleted)
       .forEach((item) => {
         if (item.type === "ROM") stats.ROM += item.quantityMT;
-        if (item.type === "Steam") stats.STEAM += item.quantityMT;
-        if (item.type === "Boulders") stats.BOULDERS += item.quantityMT;
+        if (item.type === "STEAM") stats.STEAM += item.quantityMT;
+        if (item.type === "BOULDERS") stats.BOULDERS += item.quantityMT;
       });
 
     return stats;
@@ -465,3 +465,6 @@ export default function CoalDashboard() {
     </div>
   );
 }
+
+
+

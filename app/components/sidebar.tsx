@@ -209,10 +209,10 @@ export default function Sidebar() {
                 w-full h-11 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700
                 hover:from-indigo-500 hover:to-indigo-600
                 text-white font-medium flex items-center justify-center gap-2
-                shadow-lg transition-all duration-300
+                shadow-lg transition-all duration-300 
               `}
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 ml-1.5" />
               <span
                 className={`
                   transition-all duration-500 whitespace-nowrap overflow-hidden
