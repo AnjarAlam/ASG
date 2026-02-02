@@ -375,7 +375,6 @@ export default function InwardDashboard() {
                 data={inwardTrend}
                 margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
               >
-                {/* Gradients */}
                 <defs>
                   <linearGradient id="fillA" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
@@ -385,7 +384,26 @@ export default function InwardDashboard() {
                     <stop offset="5%" stopColor="#818cf8" stopOpacity={0.35} />
                     <stop offset="95%" stopColor="#818cf8" stopOpacity={0.05} />
                   </linearGradient>
-                  {/* ... other gradients ... */}
+                  <linearGradient id="fillC" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillD" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#c084fc" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#c084fc" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillE" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#d8b4fe" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#d8b4fe" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillF" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f0abfc" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#f0abfc" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#fbb6ce" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#fbb6ce" stopOpacity={0.05} />
+                  </linearGradient>
                 </defs>
 
                 <CartesianGrid strokeDasharray="4 4" stroke="#1f2937" vertical={false} />
@@ -412,11 +430,81 @@ export default function InwardDashboard() {
                   }}
                 />
 
-                <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} iconType="circle" />
+                <Legend
+                  wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
+                  iconType="circle"
+                />
 
-                <Line type="monotone" dataKey="A" name="Area A" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillA)" />
-                <Line type="monotone" dataKey="B" name="Area B" stroke="#818cf8" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 6 }} fill="url(#fillB)" />
-                {/* Add remaining lines C-G similarly */}
+                <Line
+                  type="monotone"
+                  dataKey="A"
+                  name="Area A"
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillA)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="B"
+                  name="Area B"
+                  stroke="#818cf8"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillB)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="C"
+                  name="Area C"
+                  stroke="#a78bfa"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillC)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="D"
+                  name="Area D"
+                  stroke="#c084fc"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillD)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="E"
+                  name="Area E"
+                  stroke="#d8b4fe"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillE)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="F"
+                  name="Area F"
+                  stroke="#f0abfc"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillF)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="G"
+                  name="Area G"
+                  stroke="#fbb6ce"
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5 }}
+                  activeDot={{ r: 6 }}
+                  fill="url(#fillG)"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>

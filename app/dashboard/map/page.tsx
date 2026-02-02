@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useMapStore } from '@/store/map-store';
 import { MapPin, Trash2, Undo2, Save, AlertCircle, Edit2, Plus } from 'lucide-react';
 
-const GRID_SIZE = 5
+const GRID_SIZE = 1;
 const POINT_RADIUS = 6;
 const POINT_SNAP_RADIUS = 15;
 const EDGE_SNAP_RADIUS = 12;

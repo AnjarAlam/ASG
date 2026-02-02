@@ -75,7 +75,7 @@ export default function OutwardDashboard() {
 
     return {
       totalVehiclesToday: todayOutwards.length,
-      totalCoalOutwardToday: `${(totalNetOut/10).toFixed(2)} MT`,
+      totalCoalOutwardToday: `${(totalNetOut).toFixed(2)} MT`,
       averageNetWeight: todayOutwards.length
         ? formatWeight(totalNetOut / todayOutwards.length)
         : "0.00 MT",
@@ -89,7 +89,7 @@ export default function OutwardDashboard() {
       .map((entry) => ({
         vehicle: entry.vehicleNumber || "—",
         customer: entry.customerName || "—",
-        netWeight: formatWeight(entry.netWeight),
+        netWeight:entry.netWeight,
         grade: entry.coalGrade || "—",
         type: entry.coalType || "—",
         size: entry.coalSize || "—",
@@ -105,7 +105,7 @@ export default function OutwardDashboard() {
         tokenNumber: entry.tokenNumber || `TO-${entry._id?.slice(-8) || "XXXX"}`,
         vehicle: entry.vehicleNumber || "—",
         customer: entry.customerName || "—",
-        netWeight: formatWeight(entry.netWeight),
+        netWeight: entry.netWeight,
         grade: entry.coalGrade || "—",
         type: entry.coalType || "—",
         size: entry.coalSize || "—",
@@ -120,7 +120,7 @@ export default function OutwardDashboard() {
 
     todayOutwards.forEach((o) => {
       const grade = o.coalGrade || "Unknown";
-      map[grade] = (map[grade] || 0) + (o.netWeight || 0) / 1000;
+      map[grade] = (map[grade] || 0) + (o.netWeight || 0);
     });
 
     return Object.entries(map)
@@ -149,7 +149,7 @@ export default function OutwardDashboard() {
         areas.forEach((area) => {
           row[area] = dayData
             .filter((o) => o.area === area)
-            .reduce((sum, o) => sum + (o.netWeight || 0) / 1000, 0);
+            .reduce((sum, o) => sum + (o.netWeight || 0) , 0);
         });
 
         return row;
