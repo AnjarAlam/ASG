@@ -118,10 +118,10 @@ export default function CoalDashboard() {
 
     return stats;
   }, [inventory]);
-  console.log("inven", inventory);
+  // console.log("inven", inventory);
 
   const formatMT = (mt: number) => `${mt.toLocaleString()} MT`;
-  console.log("stema", formatMT(coalTypeStats.STEAM));
+  // console.log("stema", formatMT(coalTypeStats.STEAM));
 
   const kpis = [
     {

@@ -11,6 +11,9 @@ const POINT_SNAP_RADIUS = 15;
 const EDGE_SNAP_RADIUS = 12;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
+// Device detection for responsive behavior
+const isMobileDevice = typeof window !== 'undefined' && window.innerWidth < 768;
+
 // Utility function to check if a point is inside a polygon (ray casting algorithm)
 const isPointInPolygon = (point: { x: number; y: number }, polygon: { x: number; y: number }[]): boolean => {
   if (polygon.length < 3) return false;
@@ -187,12 +190,20 @@ export default function MapDrawPage() {
       const width = containerRef.current.clientWidth;
       const height = containerRef.current.clientHeight;
 
-      // Only update if size actually changed
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        redraw();
+      // Set canvas resolution to match display size (device pixel ratio aware)
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      // Scale canvas context for high DPI displays
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
       }
+
+      redraw();
     };
 
     updateCanvasSize();
@@ -200,7 +211,7 @@ export default function MapDrawPage() {
     let resizeTimeout: NodeJS.Timeout;
     const debouncedResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(updateCanvasSize, 80);
+      resizeTimeout = setTimeout(updateCanvasSize, 150);
     };
 
     window.addEventListener('resize', debouncedResize);
@@ -212,7 +223,7 @@ export default function MapDrawPage() {
       clearTimeout(resizeTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ctx]);
 
   // Set context once
   useEffect(() => {
@@ -376,9 +387,21 @@ export default function MapDrawPage() {
   const getSnappedPos = (clientX: number, clientY: number) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.round((clientX - rect.left) / GRID_SIZE) * GRID_SIZE;
-    const y = Math.round((clientY - rect.top) / GRID_SIZE) * GRID_SIZE;
-    return { x, y };
+    
+    // Account for device pixel ratio
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = canvasRef.current.width / dpr;
+    const canvasHeight = canvasRef.current.height / dpr;
+    
+    // Calculate position relative to canvas display size
+    const x = Math.round(((clientX - rect.left) / (rect.width)) * canvasWidth / GRID_SIZE) * GRID_SIZE;
+    const y = Math.round(((clientY - rect.top) / (rect.height)) * canvasHeight / GRID_SIZE) * GRID_SIZE;
+    
+    // Clamp to canvas bounds
+    return {
+      x: Math.max(0, Math.min(x, canvasWidth - 1)),
+      y: Math.max(0, Math.min(y, canvasHeight - 1)),
+    };
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -647,22 +670,24 @@ export default function MapDrawPage() {
     }
   };
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-black text-white p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 pb-24 md:pb-8">
+      <div className="max-w-full lg:max-w-7xl mx-auto">
         {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-            <div className="flex items-start gap-3">
-              <div className="p-3 bg-linear-to-br from-cyan-500 to-blue-600 rounded-lg">
-                <MapPin className="w-6 h-6 text-white" />
+        <div className="mb-6 sm:mb-8 md:mb-10">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 sm:gap-6">
+            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+              <div className="p-2 sm:p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex-shrink-0">
+                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-white">Map Editor</h1>
-                <p className="text-gray-400 mt-2 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {!isBoundaryClosed
-                    ? 'Phase 1: Draw the outer boundary'
-                    : 'Phase 2: Draw internal areas'}
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white truncate">Map Editor</h1>
+                <p className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2 flex items-center gap-1.5 flex-wrap">
+                  <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {!isBoundaryClosed
+                      ? 'Phase 1: Draw outer boundary'
+                      : 'Phase 2: Draw internal areas'}
+                  </span>
                 </p>
               </div>
             </div>
@@ -672,22 +697,22 @@ export default function MapDrawPage() {
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
                 title="Undo last action"
-                className={`p-2.5 sm:p-3 rounded-lg transition flex items-center gap-2 text-sm font-medium ${
+                className={`p-2 sm:p-2.5 md:p-3 rounded-lg transition flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium flex-shrink-0 ${
                   undoStack.length === 0
                     ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed opacity-50'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                 }`}
               >
-                <Undo2 className="w-5 h-5" />
+                <Undo2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="hidden sm:inline">Undo</span>
               </button>
 
               <button
                 onClick={resetAll}
                 title="Reset all drawings"
-                className="p-2.5 sm:p-3 rounded-lg bg-red-900/80 hover:bg-red-800 transition flex items-center gap-2 text-sm font-medium text-red-100"
+                className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-red-900/80 hover:bg-red-800 transition flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-red-100 flex-shrink-0"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="hidden sm:inline">Reset</span>
               </button>
 
@@ -696,13 +721,13 @@ export default function MapDrawPage() {
                   onClick={handleSaveMap}
                   disabled={isSaving}
                   title="Save map to database"
-                  className={`p-2.5 sm:p-3 rounded-lg transition flex items-center gap-2 text-sm font-medium ${
+                  className={`p-2 sm:p-2.5 md:p-3 rounded-lg transition flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium flex-shrink-0 ${
                     isSaving
                       ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
+                      : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
                   }`}
                 >
-                  <Save className="w-5 h-5" />
+                  <Save className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save Map'}</span>
                 </button>
               )}
@@ -711,29 +736,34 @@ export default function MapDrawPage() {
         </div>
 
         {/* Map Name Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-semibold text-gray-200 mb-3">Map Name</label>
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <label className="block text-xs sm:text-sm font-semibold text-gray-200 mb-2 sm:mb-3">Map Name</label>
           <input
             type="text"
             value={mapName}
             onChange={(e) => setMapName(e.target.value)}
             placeholder="e.g., Coal Stockyard - Sector A"
-            className="w-full max-w-xl px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-sm transition"
+            className="w-full max-w-2xl px-3 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-xs sm:text-sm transition"
           />
         </div>
 
         {/* Canvas Container */}
-        <div className="rounded-xl overflow-hidden border border-gray-700 shadow-2xl bg-black">
+        <div className="rounded-lg sm:rounded-xl overflow-hidden border border-gray-700 shadow-2xl bg-black mb-4 sm:mb-6 md:mb-8">
           <div
             ref={containerRef}
-            className="relative w-full bg-linear-to-br from-gray-900 to-gray-950"
-            style={{ aspectRatio: '16/9', minHeight: '500px', maxHeight: '70vh' }}
+            className="relative w-full bg-gradient-to-br from-gray-900 to-gray-950"
+            style={{ 
+              aspectRatio: '16/9',
+              minHeight: 'min(60vh, 400px)',
+              maxHeight: '75vh',
+            }}
           >
             <Image
               src="/Map.png"
               alt="Background map"
               fill
               className="object-contain opacity-30 pointer-events-none select-none"
+              priority
             />
 
             <canvas
@@ -743,84 +773,91 @@ export default function MapDrawPage() {
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerLeave={handlePointerUp}
+              style={{
+                background: 'transparent',
+                border: 'none',
+              }}
             />
 
             {/* Grid Overlay Info */}
-            <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur px-3 py-2 rounded-lg border border-gray-700/50 text-xs text-gray-300">
+            <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 md:bottom-4 md:right-4 bg-black/60 backdrop-blur px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-gray-700/50 text-xs text-gray-300">
               Grid: {GRID_SIZE}px
             </div>
           </div>
         </div>
 
         {/* Info Section */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-1">Boundary Points</p>
-            <p className="text-2xl font-bold text-cyan-400">{boundaryPoints.length}</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 sm:p-4 md:p-5">
+            <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2">Boundary Points</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-cyan-400 truncate">{boundaryPoints.length}</p>
           </div>
 
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-1">Areas Created</p>
-            <p className="text-2xl font-bold text-amber-400">{areas.length}</p>
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 sm:p-4 md:p-5">
+            <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2">Areas Created</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-400 truncate">{areas.length}</p>
           </div>
 
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-1">Status</p>
-            <p className={`text-lg font-bold ${isBoundaryClosed ? 'text-green-400' : 'text-orange-400'}`}>
-              {isBoundaryClosed ? 'Boundary ✓' : 'Drawing Boundary'}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 sm:p-4 md:p-5">
+            <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2">Status</p>
+            <p className={`text-sm sm:text-base md:text-lg font-bold ${isBoundaryClosed ? 'text-green-400' : 'text-orange-400'}`}>
+              {isBoundaryClosed ? '✓ Boundary' : 'Drawing'}
             </p>
           </div>
         </div>
 
         {/* Warning Messages */}
         {overlapWarning && (
-          <div className="mt-4 p-4 bg-red-900/30 border border-red-600/50 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-red-200 text-sm">{overlapWarning}</p>
+          <div className="mb-4 p-3 sm:p-4 bg-red-900/30 border border-red-600/50 rounded-lg flex items-start gap-2 sm:gap-3 animate-in fade-in slide-in-from-top">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-red-200 text-xs sm:text-sm leading-relaxed">{overlapWarning}</p>
           </div>
         )}
 
         {boundaryViolation && (
-          <div className="mt-4 p-4 bg-orange-900/30 border border-orange-600/50 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top">
-            <AlertCircle className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
-            <p className="text-orange-200 text-sm">{boundaryViolation}</p>
+          <div className="mb-4 p-3 sm:p-4 bg-orange-900/30 border border-orange-600/50 rounded-lg flex items-start gap-2 sm:gap-3 animate-in fade-in slide-in-from-top">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400 shrink-0 mt-0.5" />
+            <p className="text-orange-200 text-xs sm:text-sm leading-relaxed">{boundaryViolation}</p>
           </div>
         )}
 
         {/* Area Management Panel */}
         {isBoundaryClosed && selectedAreaIndex !== null && (
-          <div className="mt-6 p-4 bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-600/40 rounded-lg">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-cyan-300 flex items-center gap-2">
-                  <MapPin className="w-5 h-5" />
-                  {areas[selectedAreaIndex].name}
+          <div className="mb-4 p-3 sm:p-4 md:p-5 bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-600/40 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-cyan-300 flex items-center gap-2 truncate">
+                  <MapPin className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span className="truncate">{areas[selectedAreaIndex].name}</span>
                 </h3>
-                <p className="text-gray-400 text-sm mt-1">
+                <p className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2">
                   {areas[selectedAreaIndex].points.length} points • {isEditingArea ? 'Edit Mode' : 'View Mode'}
-                  {isEditingArea && nearbyEdgeInfo && <span className="ml-2 text-green-400">• Click edge to add point</span>}
+                  {isEditingArea && nearbyEdgeInfo && (
+                    <span className="ml-1 sm:ml-2 text-green-400 block sm:inline">• Click edge to add point</span>
+                  )}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleEditArea}
-                  className={`p-2.5 rounded-lg transition flex items-center gap-2 text-sm font-medium ${
+                  className={`p-2 sm:p-2.5 md:p-3 rounded-lg transition flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium flex-shrink-0 ${
                     isEditingArea
                       ? 'bg-green-600 hover:bg-green-500 text-white'
                       : 'bg-blue-600 hover:bg-blue-500 text-white'
                   }`}
                 >
-                  <Edit2 className="w-4 h-4" />
-                  {isEditingArea ? 'Done Editing' : 'Edit Area'}
+                  <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">{isEditingArea ? 'Done Editing' : 'Edit Area'}</span>
+                  <span className="sm:hidden">{isEditingArea ? 'Done' : 'Edit'}</span>
                 </button>
 
                 <button
                   onClick={() => handleDeleteArea(selectedAreaIndex)}
-                  className="p-2.5 rounded-lg bg-red-900/80 hover:bg-red-800 transition flex items-center gap-2 text-sm font-medium text-red-100"
+                  className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-red-900/80 hover:bg-red-800 transition flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-red-100 flex-shrink-0"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
+                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Delete</span>
                 </button>
               </div>
             </div>
@@ -829,9 +866,9 @@ export default function MapDrawPage() {
 
         {/* Phase Guidance */}
         {isBoundaryClosed && (
-          <div className="mt-6 p-4 bg-blue-900/20 border border-blue-600/40 rounded-lg">
-            <p className="text-blue-200 text-sm flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="mb-4 p-3 sm:p-4 bg-blue-900/20 border border-blue-600/40 rounded-lg">
+            <p className="text-blue-200 text-xs sm:text-sm leading-relaxed flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 shrink-0 flex-shrink-0" />
               <span>
                 {isEditingArea
                   ? `Edit Mode: Drag points to move, click on edges to add points (green highlight). Areas must stay within boundary and cannot overlap.`
@@ -844,14 +881,14 @@ export default function MapDrawPage() {
         {/* Name Modal */}
         {showNameInput && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
-            <div className="bg-gray-900 border border-cyan-600/40 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="bg-linear-to-r from-cyan-600/20 to-blue-600/20 border-b border-gray-700 px-6 py-4">
-                <h3 className="text-xl font-bold text-cyan-300">
+            <div className="bg-gray-900 border border-cyan-600/40 rounded-lg sm:rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border-b border-gray-700 px-4 sm:px-6 py-3 sm:py-4">
+                <h3 className="text-lg sm:text-xl font-bold text-cyan-300">
                   {isBoundaryClosed ? 'Name This Area' : 'Name the Boundary'}
                 </h3>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <input
                   type="text"
                   value={pendingName}
@@ -859,13 +896,13 @@ export default function MapDrawPage() {
                   placeholder="Enter name..."
                   autoFocus
                   onKeyPress={(e) => e.key === 'Enter' && handleSaveName()}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg mb-6 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-sm transition"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-700 rounded-lg mb-4 sm:mb-6 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-xs sm:text-sm transition"
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3">
                   <button
                     onClick={handleSaveName}
-                    className="flex-1 py-3 bg-linear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg font-semibold transition text-white"
+                    className="flex-1 py-2 sm:py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg font-semibold transition text-white text-sm sm:text-base"
                   >
                     Save
                   </button>
@@ -875,7 +912,7 @@ export default function MapDrawPage() {
                       setPendingName('');
                       if (isBoundaryClosed) cancelCurrentArea();
                     }}
-                    className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition text-gray-200"
+                    className="flex-1 py-2 sm:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition text-gray-200 text-sm sm:text-base"
                   >
                     Cancel
                   </button>

@@ -16,15 +16,19 @@ export default function RootLayout({
   }, []); 
 
   return (
-    <html lang="en" className="hide-scrollbar">
-      <body className="bg-gray-950 text-gray-100">
+    <html lang="en" className="hide-scrollbar scroll-smooth">
+      <body className="bg-gray-950 text-gray-100 overflow-x-hidden">
         {isAuthenticated ? (
           <div className="flex min-h-screen">
             <Sidebar />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 w-full overflow-x-hidden">
+              {children}
+            </main>
           </div>
         ) : (
-          <main className="min-h-screen">{children}</main>
+          <main className="min-h-screen w-full overflow-x-hidden">
+            {children}
+          </main>
         )}
       </body>
     </html>

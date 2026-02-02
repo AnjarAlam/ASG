@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Search,
   RefreshCw,
+  FileSearch,
 } from "lucide-react";
 import { format } from "date-fns"; // for formatting createdAt
 
@@ -181,114 +182,148 @@ export default function UsersDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white p-6 pb-24">
-      <div className="max-w-[1600px] mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white p-4 sm:p-6 md:p-8 pb-24 md:pb-8">
+      <div className="max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
 
         {/* Header + actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-gray-400 mt-1">
-              {lastFetched && <>Last updated: {lastFetched.toLocaleTimeString()}</>}
-            </p>
+        <div className="flex flex-col gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg sm:rounded-xl md:rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center shadow-lg flex-shrink-0">
+                <FileSearch className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-gray-100 truncate">
+                  User Management
+                </h1>
+                <p className="text-gray-400 text-xs sm:text-sm mt-0.5 truncate">
+                  {lastFetched ? (
+                    <>Last updated: {lastFetched.toLocaleTimeString()}</>
+                  ) : (
+                    "Never"
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <button
+                onClick={handleRefresh}
+                disabled={fetchLoading}
+                className={`
+                  flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 
+                  bg-gray-800 hover:bg-gray-700 
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  rounded-lg text-xs sm:text-sm font-medium
+                  transition-colors
+                `}
+              >
+                <RefreshCw
+                  size={16}
+                  className={`sm:size-5 ${fetchLoading ? "animate-spin" : ""}`}
+                />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+
+              <Link
+                href="/dashboard/users/register"
+                className={`
+                  flex items-center gap-2 px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3
+                  bg-indigo-600 hover:bg-indigo-500 
+                  rounded-lg sm:rounded-xl font-medium text-white
+                  shadow-lg shadow-indigo-900/30
+                  transition-all
+                  text-xs sm:text-sm
+                `}
+              >
+                <UserPlus size={16} className="sm:size-5" />
+                <span className="hidden sm:inline">Add New User</span>
+                <span className="sm:hidden">Add</span>
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleRefresh}
-              disabled={fetchLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
-            >
-              <RefreshCw size={18} className={fetchLoading ? "animate-spin" : ""} />
-              Refresh
-            </button>
-            <Link
-              href="/dashboard/users/register"
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-medium shadow-lg shadow-indigo-900/30"
-            >
-              <UserPlus size={20} />
-              Add New User
-            </Link>
-          </div>
+
         </div>
 
         {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+        <div className="relative max-w-full md:max-w-md">
+          <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500 size={16} sm:size-5" />
           <input
             type="text"
             placeholder="Search name, email, phone, role..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-gray-800/60 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition"
+            className="w-full pl-10 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-gray-800/60 border border-gray-700 rounded-lg sm:rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition"
           />
         </div>
 
         {/* Error */}
         {fetchError && (
-          <div className="p-5 bg-red-950/50 border border-red-800 rounded-xl flex items-center gap-3">
-            <AlertCircle className="text-red-400 flex-shrink-0" size={24} />
-            <span className="text-red-200">{fetchError}</span>
+          <div className="p-4 sm:p-5 bg-red-950/50 border border-red-800 rounded-lg sm:rounded-xl flex items-start gap-3">
+            <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+            <span className="text-red-200 text-sm break-words">{fetchError}</span>
           </div>
         )}
 
         {/* Loading */}
         {fetchLoading && (
-          <div className="flex flex-col items-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mb-4" />
-            <p className="text-gray-400">Loading users...</p>
+          <div className="flex flex-col items-center py-16 sm:py-20">
+            <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-indigo-500 mb-3 sm:mb-4" />
+            <p className="text-gray-400 text-sm">Loading users...</p>
           </div>
         )}
 
-        {/* Table */}
+        {/* Table - Desktop View */}
         {!fetchLoading && visibleUsers.length > 0 && (
-          <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="hidden sm:block bg-gray-900/50 border border-gray-800 rounded-lg sm:rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-800">
                 <thead className="bg-gray-800/60">
-                  <tr className="text-left text-sm uppercase tracking-wider text-gray-400">
-                    <th className="px-6 py-4">Name</th>
-                    <th className="px-6 py-4">Email</th>
-                    <th className="px-6 py-4 hidden sm:table-cell">Mobile</th>
-                    <th className="px-6 py-4">Role</th>
-                    <th className="px-6 py-4 hidden md:table-cell">Status</th>
-                    <th className="px-6 py-4">Created At</th>
+                  <tr className="text-left text-xs sm:text-sm uppercase tracking-wider text-gray-400">
+                    <th className="px-4 sm:px-6 py-3 sm:py-4">Name</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4">Email</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 hidden md:table-cell">Mobile</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4">Role</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">Status</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">Created At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {visibleUsers.map((u) => (
-                    <tr key={u._id} className="hover:bg-gray-800/40 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <User size={18} className="text-gray-400" />
-                          <span className="font-medium">{u.name}</span>
+                    <tr key={u._id} className="hover:bg-gray-800/40 transition-colors text-sm">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <User size={16} className="text-gray-400 hidden sm:block" />
+                          <span className="font-medium truncate">{u.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-300">{u.email}</td>
-                      <td className="px-6 py-4 hidden sm:table-cell text-gray-300">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-300 text-xs sm:text-sm truncate">{u.email}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 hidden md:table-cell text-gray-300 text-xs sm:text-sm">
                         {u.mobileNumber || "—"}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-gray-800 text-gray-200">
-                          <ShieldCheck size={14} />
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-xs bg-gray-800 text-gray-200 whitespace-nowrap">
+                          <ShieldCheck size={12} className="sm:size-4" />
                           {u.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4 hidden md:table-cell">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
                         {u.status !== undefined ? (
                           u.status ? (
-                            <span className="flex items-center gap-1.5 text-green-400">
-                              <CheckCircle2 size={16} /> Active
+                            <span className="flex items-center gap-1 text-green-400 text-xs sm:text-sm">
+                              <CheckCircle2 size={14} className="sm:size-4" /> Active
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5 text-red-400">
-                              <AlertCircle size={16} /> Inactive
+                            <span className="flex items-center gap-1 text-red-400 text-xs sm:text-sm">
+                              <AlertCircle size={14} className="sm:size-4" /> Inactive
                             </span>
                           )
                         ) : "—"}
                       </td>
-                      <td className="px-6 py-4 text-gray-300 text-sm">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-300 text-xs sm:text-sm whitespace-nowrap">
                         {u.createdAt
-                          ? format(new Date(u.createdAt), "MMM dd, yyyy HH:mm")
+                          ? format(new Date(u.createdAt), "MMM dd, yyyy")
                           : "—"}
                       </td>
                     </tr>
@@ -298,26 +333,26 @@ export default function UsersDashboardPage() {
             </div>
 
             {meta && (
-              <div className="px-6 py-4 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
-                <div className="text-gray-400">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs sm:text-sm">
+                <div className="text-gray-400 text-center sm:text-left">
                   Showing {(currentPage - 1) * itemsPerPage + 1}–
                   {Math.min(currentPage * itemsPerPage, meta.total)} of {meta.total}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
+                    className="p-1.5 sm:p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
                   >
-                    <ChevronLeft size={18} />
+                    <ChevronLeft size={16} className="sm:size-5" />
                   </button>
-                  <span>Page {currentPage} / {meta.totalPages}</span>
+                  <span className="text-center min-w-[60px]">Page {currentPage} / {meta.totalPages}</span>
                   <button
                     onClick={() => setCurrentPage(p => p + 1)}
                     disabled={currentPage >= meta.totalPages}
-                    className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
+                    className="p-1.5 sm:p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
                   >
-                    <ChevronRight size={18} />
+                    <ChevronRight size={16} className="sm:size-5" />
                   </button>
                 </div>
               </div>
@@ -325,14 +360,82 @@ export default function UsersDashboardPage() {
           </div>
         )}
 
+        {/* Card View - Mobile */}
+        {!fetchLoading && visibleUsers.length > 0 && (
+          <div className="sm:hidden space-y-3">
+            {visibleUsers.map((u) => (
+              <div key={u._id} className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <User size={16} className="text-gray-400 flex-shrink-0" />
+                      <h3 className="font-semibold text-white truncate">{u.name}</h3>
+                    </div>
+                    <p className="text-gray-400 text-xs mt-1 truncate">{u.email}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-800 text-gray-200 flex-shrink-0 whitespace-nowrap">
+                    <ShieldCheck size={12} />
+                    {u.role}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {u.mobileNumber && (
+                    <div>
+                      <p className="text-gray-500">Phone</p>
+                      <p className="text-gray-300 truncate">{u.mobileNumber}</p>
+                    </div>
+                  )}
+                  {u.status !== undefined && (
+                    <div>
+                      <p className="text-gray-500">Status</p>
+                      <p className={u.status ? "text-green-400" : "text-red-400"}>
+                        {u.status ? "Active" : "Inactive"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {u.createdAt && (
+                  <p className="text-gray-500 text-xs border-t border-gray-800 pt-2">
+                    Created: {format(new Date(u.createdAt), "MMM dd, yyyy HH:mm")}
+                  </p>
+                )}
+              </div>
+            ))}
+            
+            {meta && (
+              <div className="flex items-center justify-between gap-2 py-4">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-sm text-gray-400 flex-1 text-center">
+                  Page {currentPage} / {meta.totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={currentPage >= meta.totalPages}
+                  className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Empty state */}
         {!fetchLoading && visibleUsers.length === 0 && (
-          <div className="py-24 text-center text-gray-400 bg-gray-900/30 rounded-2xl border border-gray-800/50">
-            <UserPlus size={64} className="mx-auto mb-6 opacity-70" />
-            <h3 className="text-xl font-semibold text-gray-300 mb-2">
+          <div className="py-16 sm:py-24 text-center text-gray-400 bg-gray-900/30 rounded-lg sm:rounded-2xl border border-gray-800/50 px-4">
+            <UserPlus size={48} className="sm:size-64 mx-auto mb-4 sm:mb-6 opacity-70" />
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-300 mb-2">
               {searchQuery ? "No matching users" : "No users found"}
             </h3>
-            <p className="max-w-md mx-auto">
+            <p className="max-w-md mx-auto text-sm">
               {searchQuery
                 ? "Try different search terms"
                 : "You can add your first user now"}
@@ -340,9 +443,9 @@ export default function UsersDashboardPage() {
             {!searchQuery && (
               <Link
                 href="/dashboard/users/register"
-                className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-medium"
+                className="mt-4 sm:mt-6 inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg sm:rounded-xl text-white font-medium text-sm sm:text-base"
               >
-                <UserPlus size={18} />
+                <UserPlus size={18} className="sm:size-5" />
                 Register New User
               </Link>
             )}

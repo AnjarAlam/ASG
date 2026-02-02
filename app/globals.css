@@ -34,3 +34,52 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
 }
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+  }
+  
+  /* Prevent horizontal scrolling on mobile */
+  body {
+    max-width: 100vw;
+  }
+}
+
+/* Responsive text sizing */
+@layer components {
+  .responsive-text-xl {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-3xl;
+  }
+  
+  .responsive-text-lg {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+  
+  .responsive-text-sm {
+    @apply text-xs sm:text-sm md:text-base;
+  }
+  
+  /* Responsive padding for containers */
+  .responsive-p {
+    @apply p-4 sm:p-6 md:p-8 lg:p-10;
+  }
+  
+  .responsive-p-lg {
+    @apply p-6 sm:p-8 md:p-10 lg:p-12;
+  }
+  
+  .responsive-px {
+    @apply px-4 sm:px-6 md:px-8 lg:px-10;
+  }
+  
+  /* Responsive grid */
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+  
+  .responsive-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4;
+  }
+}

@@ -115,10 +115,11 @@ export default function Sidebar() {
     <>
       {/* Mobile toggle button */}
       <button
-        className="fixed top-5 left-5 z-50 lg:hidden w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-lg transition-colors"
+        className="fixed top-3 sm:top-4 left-3 sm:left-4 z-50 lg:hidden w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-lg transition-colors"
         onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
       >
-        <Package className="w-6 h-6" />
+        <Package className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
 
       {/* Mobile overlay */}
@@ -136,19 +137,19 @@ export default function Sidebar() {
           bg-gradient-to-b from-gray-950 to-gray-900
           border-r border-gray-800
           transition-all duration-500 ease-out
-          ${collapsed ? "w-20" : "w-72"}
+          ${collapsed ? "w-16 sm:w-20" : "w-64 sm:w-72"}
           ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         {/* Logo / Header */}
-        <div className="h-20 flex items-center px-5 border-b border-gray-800/60">
-          <div className="flex items-center gap-3 w-full">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shadow-md flex-shrink-0">
-              <Package className="w-6 h-6 text-white" />
+        <div className="h-16 sm:h-20 flex items-center px-3 sm:px-5 border-b border-gray-800/60">
+          <div className="flex items-center gap-2 sm:gap-3 w-full">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shadow-md flex-shrink-0">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <span
               className={`
-                text-3xl font-bold text-white tracking-tight
+                text-xl sm:text-2xl font-bold text-white tracking-tight
                 transition-all duration-500
                 ${collapsed ? "opacity-0 w-0" : "opacity-100"}
               `}
@@ -159,7 +160,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto scrollbar-hide hide-scrollbar">
+        <nav className="flex-1 px-2 sm:px-3 py-4 sm:py-6 space-y-1 overflow-y-auto scrollbar-hide hide-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -169,7 +170,7 @@ export default function Sidebar() {
                 key={item.name}
                 href={item.path}
                 className={`
-                  group flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium
+                  group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium
                   transition-all duration-300
                   ${
                     active
@@ -180,7 +181,7 @@ export default function Sidebar() {
                 onClick={() => setMobileOpen(false)}
               >
                 <Icon
-                  className={`w-5 h-5 flex-shrink-0 ${
+                  className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 ${
                     active ? "text-indigo-400" : "group-hover:text-indigo-400"
                   } transition-colors`}
                 />
@@ -198,7 +199,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom actions */}
-        <div className="px-5 pb-6 pt-4 border-t border-gray-800/60 space-y-4">
+        <div className="px-3 sm:px-5 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t border-gray-800/60 space-y-3 sm:space-y-4">
           {canCreateNewEntry && (
             <button
               onClick={() => {
@@ -206,13 +207,13 @@ export default function Sidebar() {
                 setMobileOpen(false);
               }}
               className={`
-                w-full h-11 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700
+                w-full h-9 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700
                 hover:from-indigo-500 hover:to-indigo-600
                 text-white font-medium flex items-center justify-center gap-2
-                shadow-lg transition-all duration-300 
+                shadow-lg transition-all duration-300 text-xs sm:text-sm
               `}
             >
-              <Plus className="w-5 h-5 ml-1.5" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
               <span
                 className={`
                   transition-all duration-500 whitespace-nowrap overflow-hidden
@@ -227,7 +228,7 @@ export default function Sidebar() {
           {/* Collapse toggle - visible only on desktop */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex w-full h-10 items-center justify-center rounded-xl bg-gray-800/60 hover:bg-gray-700/60 transition-colors"
+            className="hidden lg:flex w-full h-9 sm:h-10 items-center justify-center rounded-lg sm:rounded-xl bg-gray-800/60 hover:bg-gray-700/60 transition-colors"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
